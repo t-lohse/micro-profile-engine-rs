@@ -23,10 +23,19 @@ mod ffi {
 
 //use crate::ProfileGenerator;
 
+mod exit_trigger;
 mod profile;
-use crate::profile::ProfileGenerator;
+mod sampler;
+mod sensor;
+mod simplified_profile_engine;
+use sensor::SensorState;
 
-static PROFILE_JSON: &str = r#"JSON({
+use crate::exit_trigger::*;
+use crate::profile::ProfileGenerator;
+use crate::sensor::Driver;
+use crate::simplified_profile_engine::{ProfileState, SimplifiedProfileEngine};
+
+static PROFILE_JSON: &str = r#"{
     "name": "E61 with dropping pressure",
     "id": "4cdc0015-07cd-4738-b198-c7d8742acd2b",
     "author": "Carlos",
@@ -95,7 +104,7 @@ static PROFILE_JSON: &str = r#"JSON({
             ]
         }
     ]
-})JSON"#;
+}"#;
 
 fn main() {
     // Profile maxProfile;
@@ -140,35 +149,76 @@ fn main() {
     // trigger->target_stage = 1;
     // trigger->value = writeExitValue(2.0);
 
-    let generator = ProfileGenerator::try_new(PROFILE_JSON).unwrap();
-    //let max_profile = generator.profile();
+    println!("{}", std::mem::size_of::<exit_trigger::ExitTrigger>());
+    println!("{}", std::mem::size_of::<exit_trigger::ExitType>());
+    println!("{}", std::mem::size_of::<exit_trigger::ExitComparison>());
+    println!("{}", std::mem::size_of::<exit_trigger::ExitReferenceType>());
+    let trigger = ExitTrigger::new(
+        ExitType::ExitPressure,
+        ExitComparison::ExitCompGreater,
+        ExitReferenceType::ExitRefSelf,
+        10,
+        u32::MAX >> 6,
+    );
 
-    /*
+    println!("{:?}", trigger);
+    println!("{:?}", trigger.exit_type());
+    println!("{:?}", trigger.exit_comp());
+    println!("{:?}", trigger.exit_ref());
+    println!("{}", trigger.value());
 
-        Driver driver;
-        SimplifiedProfileEngine engine(&max_profile, &driver);
-        printf("After creating the engine is in state: %d\n", (short)engine.state);
+    //println!("{}", ExitTrigger::TYPE_OFFSET);
+    //println!("{}", ExitTrigger::COMP_OFFSET);
+    //println!("{}", ExitTrigger::REF_OFFSET);
 
-        try
-        {
-            engine.step();
-            printf("After one step without starting the engine is in state: %d\n", (short)engine.state);
-            printf("Starting engine\n");
-            engine.start();
-            printf("The engine is in state: %d\n",(short) engine.state);
-            while (engine.state != ProfileState::DONE) {
-                engine.step();
-                std::this_thread::sleep_for(std::chrono::milliseconds(50));
-                // We fake the piston moving 1% each step to show the piston position samping capabilities
-                if (engine.state == ProfileState::BREWING)
-                    driver.sensors.piston_position = std::min<double>(driver.sensors.piston_position + 1, 100.0);
+    // TODO: Missing files (in order):
+    // - ExitTrigger.[h|cpp] - DONE
+    // - Sensor.h - DONE
+    // - Sampler.[h|cpp] - DONE
+    // - SimplifiedProfileEngine.[h|cpp] - DONE
+    // - main.cpp
+
+    let mut generator = ProfileGenerator::try_new(PROFILE_JSON).unwrap();
+    //let mut max_profile = generator.profile();
+
+    let mut driver = Driver::default();
+    let sensor_data: *mut SensorState = driver.sensor_data_mut() as *mut SensorState;
+
+    let mut engine = SimplifiedProfileEngine::try_new(generator.profile_mut(), &driver).unwrap();
+    println!(
+        "After creating the engine is in state: {:?}",
+        engine.get_state()
+    );
+
+    //engine.step().unwrap();
+    //println!(
+    //    "After one step without starting the engine is in state: {:?}\n",
+    //    engine.get_state()
+    //);
+    println!("Starting engine");
+    engine.start();
+    let mut state = engine.get_state();
+    println!("The engine is in state: {:?}", engine.get_state());
+    let mut i = 0;
+    while (engine.get_state() != ProfileState::Done) {
+        engine.step().unwrap_or_else(|e| {
+            println!("No Stages in profile!!!");
+            return;
+        });
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        // We fake the piston moving 1% each step to show the piston position samping capabilities
+        println!("The engine is in state: {:?}", engine.get_state());
+        if (engine.get_state() == ProfileState::Brewing) {
+            unsafe {
+                (*sensor_data).piston_position =
+                    (driver.sensor_data().piston_position + 1.0).min(100.0);
+                println!("Piston: {}", (*sensor_data).piston_position)
             }
-            printf("Profile execution finished.\n");
-            printf("Profile allocated 0x%02lX bytes(%ld kB) of ram for all %d stages combined\n", generator.memoryUsed, generator.memoryUsed / 1024, max_profile.stages_len);
         }
-        catch (const NoStagesInProfileException *&e)
-        {
-            printf("No Stages in profile!!!");
-        }
-    */
+        println!("{i}");
+        i += 1;
+    }
+    println!("Profile execution finished.");
+    //println!("Profile allocated 0x{.2} bytes({} kB) of ram for all {} stages combined",
+    //    generator.memoryUsed, generator.memoryUsed / 1024, max_profile.stages_len);
 }
