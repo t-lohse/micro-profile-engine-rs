@@ -1,11 +1,5 @@
 use crate::profile::ProfileError;
 use crate::profile::StageLog;
-use hardware_connection::has_reached_final_weight;
-use hardware_connection::set_limited_pressure;
-use hardware_connection::set_target_flow;
-use hardware_connection::set_target_piston_position;
-use hardware_connection::set_target_power;
-use hardware_connection::set_target_pressure;
 
 use crate::exit_trigger;
 use crate::profile::Profile;
@@ -17,7 +11,6 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crate::sampler::Sampler;
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProfileState {
@@ -57,7 +50,7 @@ impl ProfileState {
 //#[derive(Debug)]
 pub struct SimplifiedProfileEngine<'a> {
     profile: &'a mut Profile,
-    driver: &'a Driver,
+    driver: &'a mut Driver,
     sampler: Sampler,
     start_time_stamp: Option<SystemTime>,
     current_stage_id: u16,
@@ -68,7 +61,7 @@ pub struct SimplifiedProfileEngine<'a> {
 impl<'a> SimplifiedProfileEngine<'a> {
     pub fn try_new(
         profile: &'a mut Profile,
-        driver: &'a Driver,
+        driver: &'a mut Driver,
         //sampler: Sampler,
         //start_time_stamp: usize,
         //current_stage_id: usize,
@@ -107,11 +100,12 @@ impl<'a> SimplifiedProfileEngine<'a> {
                 self.state = PS::Heating;
             }
             PS::Heating => {
-                hardware_connection::set_target_temperature(self.profile.get_temp());
-                hardware_connection::set_target_weight(self.profile.get_final_weight());
+                self.driver.set_target_temperature(self.profile.get_temp());
+                self.driver
+                    .set_target_weight(self.profile.get_final_weight());
                 // NOTE: Should be a while or async to wait for the
                 // hardware to get to temp
-                if (hardware_connection::heating_finished()) {
+                if (self.driver.heating_finished()) {
                     self.state = PS::Ready;
                 }
             }
@@ -122,7 +116,7 @@ impl<'a> SimplifiedProfileEngine<'a> {
                 }
             }
             PS::Retracting => {
-                hardware_connection::set_target_piston_position(0.0);
+                self.driver.set_target_piston_position(0.0);
                 if self.driver.sensor_data().piston_position <= 1.0 {
                     self.state = PS::Brewing;
                     self.start_time_stamp = Some(SystemTime::now());
@@ -138,7 +132,7 @@ impl<'a> SimplifiedProfileEngine<'a> {
                 }
             }
             PS::Purging => {
-                hardware_connection::set_target_piston_position(100.0);
+                self.driver.set_target_piston_position(100.0);
                 if self.driver.sensor_data().piston_position >= 99.0 {
                     self.state = PS::End;
                 }
@@ -168,7 +162,7 @@ impl<'a> SimplifiedProfileEngine<'a> {
             println!("StageID unreachable");
             return PS::Error;
         }
-        if has_reached_final_weight() {
+        if self.driver.has_reached_final_weight() {
             println!("Profile End reached via final weight hit");
             return ProfileState::Done;
         }
@@ -211,8 +205,7 @@ impl<'a> SimplifiedProfileEngine<'a> {
                 .check_exit_cond(trigger, stage_time_stamp, elapsed.as_secs_f64())
             {
                 println!("Exit trigger activated!");
-                println!("Curr stage id {}",
-                self.current_stage_id);
+                println!("Curr stage id {}", self.current_stage_id);
                 return self.transition_stage(trigger.target_stage());
             }
         }
@@ -234,22 +227,26 @@ impl<'a> SimplifiedProfileEngine<'a> {
         if stage.dynamics().limits().flow > crate::profile::Flow(0) {
             //let flow_limit = parseProfileFlow(stage.dynamics.limits.flow);
             let flow_limit = stage.dynamics().limits().flow;
-            hardware_connection::set_limited_flow(flow_limit);
+            self.driver.set_limited_flow(flow_limit);
         }
         if (stage.dynamics().limits().pressure > crate::profile::Pressure(0)) {
             let pressure_limit = stage.dynamics().limits().pressure;
-            hardware_connection::set_limited_pressure(pressure_limit); // NOTE: In C++ it is limited flow?
+            self.driver.set_limited_pressure(pressure_limit); // NOTE: In C++ it is limited flow?
         }
 
         match stage.dynamics().ctrl() {
             crate::profile::ControlType::ControlPressure => {
-                set_target_pressure(sampled_output.into())
+                self.driver.set_target_pressure(sampled_output.into())
             }
-            crate::profile::ControlType::ControlFlow => set_target_flow(sampled_output.into()),
-            crate::profile::ControlType::ControlPower => set_target_power(sampled_output.into()),
-            crate::profile::ControlType::ControlPistonPosition => {
-                set_target_piston_position(sampled_output.into())
+            crate::profile::ControlType::ControlFlow => {
+                self.driver.set_target_flow(sampled_output.into())
             }
+            crate::profile::ControlType::ControlPower => {
+                self.driver.set_target_power(sampled_output.into())
+            }
+            crate::profile::ControlType::ControlPistonPosition => self
+                .driver
+                .set_target_piston_position(sampled_output.into()),
         }
 
         PS::Brewing
@@ -269,66 +266,13 @@ impl<'a> SimplifiedProfileEngine<'a> {
             return ProfileState::Done;
         }
 
-//        self.current_stage_id = target_stage.into();
-        self.current_stage_id += 1;// target_stage.into();
+        //        self.current_stage_id = target_stage.into();
+        self.current_stage_id += 1; // target_stage.into();
         if self.current_stage_id as usize >= self.profile.get_stages().len() {
             println!("Next StageID unreachable");
             return ProfileState::Done;
         }
         self.save_stage_log(None);
         PS::Brewing
-    }
-}
-
-mod hardware_connection {
-    use crate::profile::{Flow, Pressure, Temp, Weight};
-
-    pub fn heating_finished() -> bool {
-        true
-    }
-
-    pub fn has_reached_final_weight() -> bool {
-        false
-    }
-
-    pub fn set_target_weight(set_point: Weight) {
-        println!("Setting target weight to {}", Into::<f64>::into(set_point));
-    }
-
-    pub fn set_target_temperature(set_point: Temp) {
-        println!(
-            "Setting target temperature to {}",
-            Into::<f64>::into(set_point)
-        );
-    }
-
-    pub fn set_target_pressure(set_point: Pressure) {
-        println!(
-            "Setting target pressure to {}",
-            Into::<f64>::into(set_point)
-        );
-    }
-
-    pub fn set_limited_pressure(set_point: Pressure) {
-        println!(
-            "Setting target pressure limit to {}",
-            Into::<f64>::into(set_point)
-        );
-    }
-
-    pub fn set_target_flow(set_point: Flow) {
-        println!("Setting target flow to {}", Into::<f64>::into(set_point));
-    }
-
-    pub fn set_limited_flow(set_point: Flow) {
-        println!("Setting flow limit to {}", Into::<f64>::into(set_point));
-    }
-
-    pub fn set_target_power(set_point: f64) {
-        println!("Setting target power to {}", set_point);
-    }
-
-    pub fn set_target_piston_position(set_point: f64) {
-        println!("Setting target piston position to {}", set_point);
     }
 }

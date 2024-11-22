@@ -1,4 +1,5 @@
-use crate::{ExitComparison, ExitReferenceType, ExitTrigger, ExitType};
+use crate::profile::{Flow, Pressure, Temp, Weight};
+
 #[derive(Default, Clone, Debug)]
 pub struct SensorState {
     pub piston_position: f64,
@@ -32,53 +33,108 @@ impl Driver {
     pub fn sensor_data(&self) -> &SensorState {
         &self.sensors
     }
+
+    /*
     pub fn sensor_data_mut(&mut self) -> &mut SensorState {
         &mut self.sensors
     }
+     */
 
-    fn get_exit_input(
-        &self,
-        trigger: &ExitTrigger,
-        stage_timestamp: f64,
-        profile_timestamp: f64,
-    ) -> f64 {
-        match trigger.exit_type() {
-            ExitType::ExitPressure => self.sensors.water_pressure,
-            ExitType::ExitFlow => self.sensors.water_flow,
-            ExitType::ExitTime => {
-                (if trigger.exit_ref().is_absolute() {
-                    profile_timestamp as f64
-                } else {
-                    stage_timestamp as f64
-                }) / 1_000.0
-            }
-
-            ExitType::ExitWeight => self.sensors.weight,
-            ExitType::ExitPistonPosition => self.sensors.piston_position,
-            ExitType::ExitTemperature => self.sensors.stable_temperature,
-            ExitType::ExitPower => unimplemented!("Exit button not done yet"),
-            ExitType::ExitButton => self
-                .get_button_gesture("Encoder Button", "Single Tap")
-                .into(),
-        }
-    }
-
-    pub fn check_exit_cond(
-        &self,
-        trigger: &ExitTrigger,
-        stage_timestamp: f64,
-        profile_timestamp: f64,
-    ) -> bool {
-        let current_value = self.get_exit_input(trigger, stage_timestamp, profile_timestamp);
-        let exit_value = trigger.value().into(); // as f64;
-
-        match trigger.exit_comp() {
-            ExitComparison::ExitCompSmaller => current_value <= exit_value,
-            ExitComparison::ExitCompGreater => current_value >= exit_value,
-        }
-    }
-
-    fn get_button_gesture(&self, source: &str, gesture: &str) -> bool {
+    pub fn get_button_gesture(&self, source: &str, gesture: &str) -> bool {
         false
+    }
+
+    // -------- HW ---------
+    pub fn heating_finished(&self) -> bool {
+        hardware_connection::heating_finished()
+    }
+
+    pub fn has_reached_final_weight(&self) -> bool {
+        hardware_connection::has_reached_final_weight()
+    }
+
+    pub fn set_target_weight(&self, set_point: Weight) {
+        hardware_connection::set_target_weight(set_point)
+    }
+
+    pub fn set_target_temperature(&self, set_point: Temp) {
+        hardware_connection::set_target_temperature(set_point)
+    }
+
+    pub fn set_target_pressure(&self, set_point: Pressure) {
+        hardware_connection::set_target_pressure(set_point)
+    }
+
+    pub fn set_limited_pressure(&self, set_point: Pressure) {
+        hardware_connection::set_limited_pressure(set_point)
+    }
+
+    pub fn set_target_flow(&self, set_point: Flow) {
+        hardware_connection::set_target_flow(set_point)
+    }
+
+    pub fn set_limited_flow(&self, set_point: Flow) {
+        hardware_connection::set_limited_flow(set_point)
+    }
+
+    pub fn set_target_power(&self, set_point: f64) {
+        hardware_connection::set_target_power(set_point)
+    }
+
+    pub fn set_target_piston_position(&self, set_point: f64) {
+        hardware_connection::set_target_piston_position(set_point)
+    }
+}
+
+mod hardware_connection {
+    use crate::profile::{Flow, Pressure, Temp, Weight};
+
+    pub fn heating_finished() -> bool {
+        true
+    }
+
+    pub fn has_reached_final_weight() -> bool {
+        false
+    }
+
+    pub fn set_target_weight(set_point: Weight) {
+        println!("Setting target weight to {}", Into::<f64>::into(set_point));
+    }
+
+    pub fn set_target_temperature(set_point: Temp) {
+        println!(
+            "Setting target temperature to {}",
+            Into::<f64>::into(set_point)
+        );
+    }
+
+    pub fn set_target_pressure(set_point: Pressure) {
+        println!(
+            "Setting target pressure to {}",
+            Into::<f64>::into(set_point)
+        );
+    }
+
+    pub fn set_limited_pressure(set_point: Pressure) {
+        println!(
+            "Setting target pressure limit to {}",
+            Into::<f64>::into(set_point)
+        );
+    }
+
+    pub fn set_target_flow(set_point: Flow) {
+        println!("Setting target flow to {}", Into::<f64>::into(set_point));
+    }
+
+    pub fn set_limited_flow(set_point: Flow) {
+        println!("Setting flow limit to {}", Into::<f64>::into(set_point));
+    }
+
+    pub fn set_target_power(set_point: f64) {
+        println!("Setting target power to {}", set_point);
+    }
+
+    pub fn set_target_piston_position(set_point: f64) {
+        println!("Setting target piston position to {}", set_point);
     }
 }
