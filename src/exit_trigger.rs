@@ -7,16 +7,18 @@ pub struct ExitTrigger {
     //r#type: ExitType,
     //comparison: ExitComparison,
     //reference: ExitReferenceType,
-    target_stage: u8,
+    //target_stage: u8,
     value: u32,
 }
 
 impl ExitTrigger {
     const TYPE_OFFSET: u32 = 0;
-    const COMP_OFFSET: u32 = Self::TYPE_OFFSET + ExitType::BIT_SIZE;
-    const REF_OFFSET: u32 = Self::COMP_OFFSET + ExitComparison::BIT_SIZE;
+    const COMP_OFFSET: u32 = Self::TYPE_OFFSET + ExitType::BITS;
+    const REF_OFFSET: u32 = Self::COMP_OFFSET + ExitComparison::BITS;
 
-    const VALUE_OFFSET: u32 = Self::REF_OFFSET + ExitReferenceType::BIT_SIZE;
+    const TARGET_OFFSET: u32 = Self::REF_OFFSET + ExitReferenceType::BITS;
+
+    const VALUE_OFFSET: u32 = Self::TARGET_OFFSET + u8::BITS;
     pub const VALUE_MAX: u32 = u32::MAX >> Self::VALUE_OFFSET;
 
     pub fn new(
@@ -36,15 +38,15 @@ impl ExitTrigger {
         let value = value << Self::VALUE_OFFSET
             | ((r#type as u32) << Self::TYPE_OFFSET)
             | ((comparison as u32) << Self::COMP_OFFSET)
-            | ((reference as u32) << Self::REF_OFFSET);
+            | ((reference as u32) << Self::REF_OFFSET)
+            | ((target_stage as u32) << Self::TARGET_OFFSET);
 
-        //println!("{value}");
 
         Self {
             //r#type,
             //comparison,
             //reference,
-            target_stage,
+            //target_stage,
             value,
         }
     }
@@ -52,28 +54,28 @@ impl ExitTrigger {
     pub fn exit_type(&self) -> ExitType {
         //self.r#type
         //(((self.value as ExitType::OutpuT) >> ExitType::OFFSET) & ExitType::SIZE)
-        ((self.value >> Self::TYPE_OFFSET) & 2u32.pow(ExitType::BIT_SIZE) - 1)
+        ((self.value >> Self::TYPE_OFFSET) & 2u32.pow(ExitType::BITS) - 1)
             .try_into()
             .unwrap()
     }
     pub fn exit_comp(&self) -> ExitComparison {
         //self.comparison
-        ((self.value >> Self::COMP_OFFSET) & 2u32.pow(ExitComparison::BIT_SIZE) - 1)
+        ((self.value >> Self::COMP_OFFSET) & 2u32.pow(ExitComparison::BITS) - 1)
             .try_into()
             .unwrap()
     }
     pub fn exit_ref(&self) -> ExitReferenceType {
         //self.reference
-        ((self.value >> Self::REF_OFFSET) & 2u32.pow(ExitReferenceType::BIT_SIZE) - 1)
+        ((self.value >> Self::REF_OFFSET) & 2u32.pow(ExitReferenceType::BITS) - 1)
             .try_into()
             .unwrap()
     }
     pub fn value(&self) -> u32 {
         //self.value
-        self.value >> (Self::REF_OFFSET + ExitReferenceType::BIT_SIZE)
+        self.value >> (Self::REF_OFFSET + ExitReferenceType::BITS)
     }
     pub fn target_stage(&self) -> u8 {
-        self.target_stage // TODO: BIT STUFF
+        ((self.value >> Self::TARGET_OFFSET) & (2u32.pow(u8::BITS) - 1)) as u8
     }
 
     //fn get_exit_input(&self, driver: &Driver)
@@ -95,7 +97,7 @@ pub enum ExitType {
 impl ExitType {
     const MAX_VALUE: u32 = 7;
     //const BIT_SIZE: u32 = Self::MAX_VALUE.ilog2();
-    const BIT_SIZE: u32 = if Self::MAX_VALUE.is_power_of_two() && Self::MAX_VALUE != 1 {
+    const BITS: u32 = if Self::MAX_VALUE.is_power_of_two() && Self::MAX_VALUE != 1 {
         Self::MAX_VALUE.ilog2()
     } else {
         Self::MAX_VALUE.ilog2() + 1
@@ -113,7 +115,7 @@ pub enum ExitComparison {
 
 impl ExitComparison {
     const MAX_VALUE: u32 = 1;
-    const BIT_SIZE: u32 = if Self::MAX_VALUE.is_power_of_two() && Self::MAX_VALUE != 1 {
+    const BITS: u32 = if Self::MAX_VALUE.is_power_of_two() && Self::MAX_VALUE != 1 {
         Self::MAX_VALUE.ilog2()
     } else {
         Self::MAX_VALUE.ilog2() + 1
@@ -131,7 +133,7 @@ pub enum ExitReferenceType {
 
 impl ExitReferenceType {
     const MAX_VALUE: u32 = 1;
-    const BIT_SIZE: u32 = if Self::MAX_VALUE.is_power_of_two() && Self::MAX_VALUE != 1 {
+    const BITS: u32 = if Self::MAX_VALUE.is_power_of_two() && Self::MAX_VALUE != 1 {
         Self::MAX_VALUE.ilog2()
     } else {
         Self::MAX_VALUE.ilog2() + 1
