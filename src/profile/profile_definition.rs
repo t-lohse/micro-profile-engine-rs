@@ -17,6 +17,11 @@ impl Into<f64> for Flow {
         <u8 as Into<f64>>::into(self.0) / 10.0
     }
 }
+impl Into<u16> for Flow {
+    fn into(self) -> u16 {
+        (self.0 / 10) as u16
+    }
+}
 
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(transparent)]
@@ -31,6 +36,11 @@ impl Into<f64> for Pressure {
         <u8 as Into<f64>>::into(self.0) / 10.0
     }
 }
+impl Into<u16> for Pressure {
+    fn into(self) -> u16 {
+        (self.0 / 10) as u16
+    }
+}
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct Percent(pub u8);
@@ -41,7 +51,12 @@ impl From<f64> for Percent {
 }
 impl Into<f64> for Percent {
     fn into(self) -> f64 {
-        <u8 as Into<f64>>::into(self.0) / 10.0
+        <u8 as Into<f64>>::into(self.0)
+    }
+}
+impl Into<u16> for Percent {
+    fn into(self) -> u16 {
+        self.0 as u16
     }
 }
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
@@ -57,6 +72,11 @@ impl Into<f64> for Temp {
         <u16 as Into<f64>>::into(self.0) / 10.0
     }
 }
+impl Into<u16> for Temp {
+    fn into(self) -> u16 {
+        (self.0 / 10) as u16
+    }
+}
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct Weight(u16);
@@ -68,6 +88,11 @@ impl From<f64> for Weight {
 impl Into<f64> for Weight {
     fn into(self) -> f64 {
         <u16 as Into<f64>>::into(self.0) / 10.0
+    }
+}
+impl Into<u16> for Weight {
+    fn into(self) -> u16 {
+        (self.0 / 10) as u16
     }
 }
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
@@ -83,11 +108,15 @@ impl Into<f64> for TimeStamp {
         <u16 as Into<f64>>::into(self.0) / 10.0
     }
 }
-
+impl Into<u16> for TimeStamp {
+    fn into(self) -> u16 {
+        (self.0 / 10) as u16
+    }
+}
 pub struct Profile {
     start_time: usize,
     stage_len: usize,
-    temparature: Temp,
+    temperature: Temp,
     final_weight: Weight,
     wait_after_heating: bool,
     auto_purge: bool,
@@ -112,7 +141,7 @@ impl Profile {
         Self {
             start_time,
             stage_len,
-            temparature,
+            temperature: temparature,
             final_weight,
             wait_after_heating,
             auto_purge,
@@ -142,7 +171,7 @@ impl Profile {
         self.final_weight
     }
     pub fn get_temp(&self) -> Temp {
-        self.temparature
+        self.temperature
     }
     pub fn wait_after_heating(&self) -> bool {
         self.wait_after_heating
@@ -278,11 +307,12 @@ pub enum YVal {
 
 impl YVal {
     pub fn value(&self) -> u16 {
+        println!("yval: {self:?}");
         match *self {
-            YVal::Flow(Flow(v)) => v.into(),
-            YVal::Pressure(Pressure(v)) => v.into(),
-            YVal::Power(Percent(v)) => v.into(),
-            YVal::PistonPosition(Percent(v)) => v.into(),
+            YVal::Flow(v) => v.into(),
+            YVal::Pressure(v) => v.into(),
+            YVal::Power(v) => v.into(),
+            YVal::PistonPosition(v) => v.into(),
             YVal::Val(v) => v,
         }
     }
@@ -459,26 +489,20 @@ impl TryFrom<&json::object::Object> for Stage {
                     p[0].as_f64()
                         .ok_or(ProfileError::unexpected_type("float"))
                         .and_then(|x| -> Result<Point, ProfileError> {
-                            if ctrl.is_percentage() {
-                                Ok(Point::new(
-                                    x as u16,
-                                    YVal::Val(
-                                        p[0].as_f64()
-                                            .ok_or(ProfileError::unexpected_type("float"))?
-                                            as u16,
-                                    ),
-                                ))
-                            } else {
-                                Ok(Point::new(
-                                    x as u16,
-                                    YVal::Val(
-                                        p[0].as_f64()
-                                            .ok_or(ProfileError::unexpected_type("float"))?
-                                            as u16
-                                            * 10,
-                                    ),
-                                ))
-                            }
+                            let y = match ctrl {
+                                ControlType::ControlPressure => YVal::Pressure(p[0].as_f64()
+                                    .ok_or(ProfileError::unexpected_type("float"))?.into()),
+                                ControlType::ControlFlow => YVal::Flow(p[0].as_f64()
+                                    .ok_or(ProfileError::unexpected_type("float"))?.into()),
+                                ControlType::ControlPower => YVal::Power(p[0].as_f64()
+                                    .ok_or(ProfileError::unexpected_type("float"))?.into()),
+                                ControlType::ControlPistonPosition => YVal::PistonPosition(p[0].as_f64()
+                                    .ok_or(ProfileError::unexpected_type("float"))?.into()),
+                            };
+                            Ok(Point::new(
+                                x as u16,
+                                y,
+                            ))
                         })
                 })
                 .collect::<Result<Vec<_>, _>>()?;

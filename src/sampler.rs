@@ -2,6 +2,7 @@ use crate::profile::{ControlType, InterpolationType, Point};
 use crate::profile::{Flow, Percent, Pressure, YVal};
 use crate::profile::{InputType, Stage};
 
+#[derive(Debug)]
 struct SamplerPoint {
     pub x: f64,
     pub y: f64,
@@ -14,6 +15,7 @@ impl SamplerPoint {
 
     pub fn from_ctr_point(ctrl: ControlType, point: Point, unit_conversion: i64) -> Self {
         //let y = match ctrl {};
+        println!("ctrl: {ctrl:?} - {:?}", point.y);
         let y = point.y.value().into();
         let x = point.x as f64 / 10f64 * unit_conversion as f64;
         Self { x, y }
@@ -31,11 +33,12 @@ pub struct Sampler {
 
 impl Sampler {
     pub fn get(&mut self, current_ref_input: f64) -> f64 {
+        println!("{current_ref_input} -- {:?}", self.points);
         match <Vec<_> as AsRef<[_]>>::as_ref(&self.points) {
             [one] => one.y,
             [first, ..] if first.x >= current_ref_input => first.y,
             [.., last] if last.x <= current_ref_input => last.y,
-            _ => self.get_value_linear(current_ref_input),
+            _ => self.get_value_linear(current_ref_input), // TODO: Should be linear
         }
         //let first_point = self.points.first()
     }

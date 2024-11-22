@@ -162,6 +162,7 @@ impl<'a> SimplifiedProfileEngine<'a> {
 
     fn process_stage_step(&mut self) -> ProfileState {
         use ProfileState as PS;
+        let mut _self = self as *mut Self;
 
         if (self.current_stage_id as usize >= self.profile.get_stages().len()) {
             println!("StageID unreachable");
@@ -188,11 +189,15 @@ impl<'a> SimplifiedProfileEngine<'a> {
             .start_time_stamp
             .unwrap()
             .duration_since(*stage_log.get_start().get_timestamp())
+            .or_else(|e| Ok::<Duration, ()>(e.duration()))
             .unwrap()
             .as_millis() as f64;
         if !stage_log.is_valid() {
-            // TODO: fuck this
-            self.save_stage_log(None);
+            unsafe {
+                //let mut _self = self as *mut Self;
+                (*_self).save_stage_log(None);
+            }
+            //self.save_stage_log(None);
         }
         //let stage_time_stamp = (SystemTime.now()
         //    - (self.start_time_stamp.unwrap()
@@ -206,10 +211,12 @@ impl<'a> SimplifiedProfileEngine<'a> {
                 .check_exit_cond(trigger, stage_time_stamp, elapsed.as_secs_f64())
             {
                 println!("Exit trigger activated!");
+                println!("Curr stage id {}",
+                self.current_stage_id);
                 return self.transition_stage(trigger.target_stage());
             }
         }
-        let mut input_ref_val = match stage.dynamics().input_type() {
+        let input_ref_val = match stage.dynamics().input_type() {
             crate::profile::InputType::InputTime => stage_time_stamp,
             crate::profile::InputType::InputPistonPosition => {
                 self.driver.sensor_data().piston_position
@@ -222,9 +229,9 @@ impl<'a> SimplifiedProfileEngine<'a> {
         println!("sampled ({},{})", input_ref_val, sampled_output);
         println!("Setting output at {:?} ms to {}", elapsed, sampled_output);
 
-        // Dont use the parsed value for limiter checks here as the
+        // Don't use the parsed value for limiter checks here as the
         // float might not be perfectly encoding zero
-        if (stage.dynamics().limits().flow > crate::profile::Flow(0)) {
+        if stage.dynamics().limits().flow > crate::profile::Flow(0) {
             //let flow_limit = parseProfileFlow(stage.dynamics.limits.flow);
             let flow_limit = stage.dynamics().limits().flow;
             hardware_connection::set_limited_flow(flow_limit);
@@ -262,7 +269,8 @@ impl<'a> SimplifiedProfileEngine<'a> {
             return ProfileState::Done;
         }
 
-        self.current_stage_id = target_stage.into();
+//        self.current_stage_id = target_stage.into();
+        self.current_stage_id += 1;// target_stage.into();
         if self.current_stage_id as usize >= self.profile.get_stages().len() {
             println!("Next StageID unreachable");
             return ProfileState::Done;

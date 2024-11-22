@@ -249,7 +249,7 @@ impl TryFrom<&json::object::Object> for ExitTrigger {
             //.as_bool()
             //.ok_or(ProfileError::unexpected_type("bool"))?
             //.into(),
-            //e.get("target_stage").map().unwrap_or()
+            //e.get("target_stage"),
             10, // TODO: TARGET STAGE
             e["value"].as_u32().unwrap_or_default(),
         ))
