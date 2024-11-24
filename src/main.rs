@@ -1,5 +1,12 @@
-mod dynamics;
-mod exit_trigger;
+macro_rules! json_val_to_obj_tryfrom {
+    ($x:expr) => {
+        match $x {
+            json::JsonValue::Object(o) => Self::try_from(o),
+            _ => Err(ProfileError::Type("Expected object, got other".to_string())),
+        }
+    };
+}
+
 mod profile;
 //mod sampler;
 mod engine;
@@ -7,9 +14,7 @@ mod sensor;
 
 use crate::engine::*;
 use crate::profile::{FromJson, Profile};
-// use crate::profile::ProfileGenerator;
 use crate::sensor::{Driver, DummySensorState};
-//use crate::simplified_profile_engine::{ProfileState, SimplifiedProfileEngine};
 
 static PROFILE_JSON: &str = r#"{
     "name": "E61 with dropping pressure",
@@ -112,7 +117,7 @@ fn main() {
             }
         };
         std::thread::sleep(std::time::Duration::from_millis(50));
-        // We fake the piston moving 1% each step to show the piston position samping capabilities
+        // We fake the piston moving 1% each step to show the piston position sampling capabilities
         println!("The engine is in state: {:?}", engine.get_state());
         if engine.get_state() == ProfileState::Brewing {
             unsafe {
@@ -125,49 +130,4 @@ fn main() {
     println!("Profile execution finished.");
     //println!("Profile allocated 0x{.2} bytes({} kB) of ram for all {} stages combined",
     //    generator.memoryUsed, generator.memoryUsed / 1024, max_profile.stages_len);
-    /*
-        let mut generator = ProfileGenerator::try_new(PROFILE_JSON).unwrap();
-        //let mut max_profile = generator.profile();
-
-        let mut driver = Driver::default();
-        let sensor_data: *mut SensorState = driver.sensor_data_mut() as *mut SensorState;
-
-        let mut engine = SimplifiedProfileEngine::try_new(generator.profile_mut(), &driver).unwrap();
-        println!(
-            "After creating the engine is in state: {:?}",
-            engine.get_state()
-        );
-
-        //engine.step().unwrap();
-        //println!(
-        //    "After one step without starting the engine is in state: {:?}\n",
-        //    engine.get_state()
-        //);
-        println!("Starting engine");
-        engine.start();
-        let mut state = engine.get_state();
-        println!("The engine is in state: {:?}", engine.get_state());
-        let mut i = 0;
-        while (engine.get_state() != ProfileState::Done) {
-            engine.step().unwrap_or_else(|e| {
-                println!("No Stages in profile!!!");
-                return;
-            });
-            std::thread::sleep(std::time::Duration::from_millis(50));
-            // We fake the piston moving 1% each step to show the piston position samping capabilities
-            println!("The engine is in state: {:?}", engine.get_state());
-            if (engine.get_state() == ProfileState::Brewing) {
-                unsafe {
-                    (*sensor_data).piston_position =
-                        (driver.sensor_data().piston_position + 1.0).min(100.0);
-                    println!("Piston: {}", (*sensor_data).piston_position)
-                }
-            }
-            println!("{i}");
-            i += 1;
-        }
-        println!("Profile execution finished.");
-        //println!("Profile allocated 0x{.2} bytes({} kB) of ram for all {} stages combined",
-        //    generator.memoryUsed, generator.memoryUsed / 1024, max_profile.stages_len);
-    */
 }

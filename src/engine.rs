@@ -1,5 +1,5 @@
-use crate::dynamics::{ControlType, InputType, Limits};
 use crate::engine::EngineStepResult::{Finished, Next};
+use crate::profile::dynamics::{ControlType, InputType, Limits};
 use crate::profile::{Flow, Pressure, Profile, StageVariables};
 use crate::sensor::{Driver, SensorState};
 use std::time::SystemTime;
@@ -54,7 +54,6 @@ impl<'a, T: SensorState> ProfileEngineIdle<'a, T> {
         if profile.get_stages().is_empty() {
             return Err("Profile with no states is not allowed");
         }
-        //let sampler = Sampler::load_from_stage(&profile.get_stages()[0], 0);
 
         Ok(Self {
             profile,
@@ -133,12 +132,7 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
                         driver: self.driver,
                     });
                 }
-            } //PS::End => {
-              //   // self.state = PS::Idle;
-              //}
-              //PS::Error => (),
-              // NOTE: What I think should happen:
-              // PS::Error => return Err("Trying to step from Error state, fix flaw in machine"),
+            }
         }
 
         Next(self)
@@ -182,31 +176,16 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
             );
             log.put_exit_log(vars);
         };
-
-        //log = &this->profile->stage_log[this->currentStageId];
-
-        //vars->flow = writeProfileFlow(this->driver->get_sensor_data().water_flow);
-        //vars->piston_position = writeProfilePercent(this->driver->get_sensor_data().piston_position);
-        //vars->pressure = writeProfilePressure(this->driver->get_sensor_data().water_pressure);
-        //vars->timestamp = timestamp;
-        //
-        //log->valid = true;
-        //self.profile.get_stage_logs_mut().push(StageLog::test())
     }
 
     fn process_stage_step(&mut self) -> Result<ProfileState, &'static str> {
         use ProfileState as PS;
-        //let mut _self = self as *mut Self;
-
-        //if self.current_stage_id as usize >= self.profile.get_stages().len() {
-        //    return Err("StageID unreachable");
-        //}
         if self.driver.has_reached_final_weight() {
             println!("Profile End reached via final weight hit");
             return Ok(ProfileState::Done);
         }
 
-        println!("executing stage={}\n", self.current_stage_id);
+        println!("executing stage={}", self.current_stage_id);
 
         let elapsed = self.profile_start_time.elapsed().unwrap();
 
@@ -223,26 +202,6 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
 
         let stage = &self.profile.get_stages()[&self.current_stage_id];
 
-        //TODO: What does the sampler actually do???!
-        // Ensure the sampler is fed with the right stage
-        //if self.sampler.stage_id != self.current_stage_id {
-        //    self.sampler.load_new_stage(stage, self.current_stage_id);
-        //}
-        //
-        //let stage_time_stamp = self
-        //    .start_time_stamp
-        //    .unwrap()
-        //    .duration_since(*stage_log.get_start().get_timestamp())
-        //    .or_else(|e| Ok::<Duration, ()>(e.duration()))
-        //    .unwrap()
-        //    .as_millis() as f64;
-        //if !stage_log.is_valid() {
-        //    unsafe {
-        //        //let mut _self = self as *mut Self;
-        //        (*_self).save_stage_log(None);
-        //    }
-        //    //self.save_stage_log(None);
-        //}
         let exit_triggers = stage.exit_triggers();
 
         for trigger in exit_triggers {
@@ -280,8 +239,8 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
         // float might not be perfectly encoding zero
         for l in stage.limits() {
             match l {
-                Limits::Pressure(p) => self.driver.set_limited_pressure(Pressure(*p)), // NOTE: In C++ it is limited flow?
-                Limits::Flow(f) => self.driver.set_limited_flow(Flow(*f)),
+                Limits::Pressure(p) => self.driver.set_limited_pressure(Pressure::new(*p)), // NOTE: In C++ it is limited flow?
+                Limits::Flow(f) => self.driver.set_limited_flow(Flow::new(*f)),
             }
         }
 
@@ -313,20 +272,5 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
             println!("Profile End reached via stage end");
             PS::Done
         }
-
-        //self.save_stage_log(Some(SystemTime::now()));
-        //
-        //if self.current_stage_id == target_stage {
-        //    println!("Profile End reached via stage end");
-        //    return ProfileState::Done;
-        //}
-        //
-        ////        self.current_stage_id = target_stage.into();
-        //self.current_stage_id += 1; // target_stage.into();
-        //if self.current_stage_id as usize >= self.profile.get_stages().len() {
-        //    println!("Next StageID unreachable");
-        //    return ProfileState::Done;
-        //}
-        //self.save_stage_log(None);
     }
 }

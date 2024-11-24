@@ -33,12 +33,6 @@ impl<T: SensorState> Driver<T> {
         &self.sensors
     }
 
-    /*
-    pub fn sensor_data_mut(&mut self) -> &mut SensorState {
-        &mut self.sensors
-    }
-     */
-
     pub fn get_button_gesture(&self, _source: &str, _gesture: &str) -> bool {
         false
     }

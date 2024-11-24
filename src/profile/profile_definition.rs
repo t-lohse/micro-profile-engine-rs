@@ -1,85 +1,10 @@
-use super::ProfileError;
-use crate::dynamics::{ControlType, Dynamics, Limits};
-use crate::exit_trigger::{ExitComparison, ExitTrigger, ExitType};
+use super::{ProfileError, StageLog, Temp, Weight};
+use crate::profile::dynamics::{ControlType, Dynamics, Limits};
+use crate::profile::exit_trigger::{ExitComparison, ExitTrigger, ExitType};
+use crate::profile::stage::Stage;
 use json::object::Object;
 use json::JsonValue;
 use std::collections::HashMap;
-use std::time::SystemTime;
-
-#[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd)]
-#[repr(transparent)]
-pub struct Flow(pub f64);
-impl From<f64> for Flow {
-    fn from(value: f64) -> Self {
-        Self(value * 10.0)
-    }
-}
-
-impl From<Flow> for f64 {
-    fn from(val: Flow) -> Self {
-        val.0 / 10.0
-    }
-}
-
-#[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd)]
-#[repr(transparent)]
-pub struct Pressure(pub f64);
-impl From<f64> for Pressure {
-    fn from(value: f64) -> Self {
-        Self(value * 10.0)
-    }
-}
-impl From<Pressure> for f64 {
-    fn from(val: Pressure) -> Self {
-        val.0 / 10.0
-    }
-}
-
-#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(transparent)]
-pub struct Percent(pub u8);
-impl From<f64> for Percent {
-    fn from(value: f64) -> Self {
-        Self(value as u8)
-    }
-}
-impl From<Percent> for f64 {
-    fn from(val: Percent) -> Self {
-        <u8 as Into<f64>>::into(val.0)
-    }
-}
-impl From<Percent> for u16 {
-    fn from(val: Percent) -> Self {
-        val.0 as u16
-    }
-}
-#[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd)]
-#[repr(transparent)]
-pub struct Temp(f64);
-impl From<f64> for Temp {
-    fn from(value: f64) -> Self {
-        Self(value * 10.0)
-    }
-}
-impl From<Temp> for f64 {
-    fn from(val: Temp) -> Self {
-        val.0 / 10.0
-    }
-}
-
-#[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd)]
-#[repr(transparent)]
-pub struct Weight(f64);
-impl From<f64> for Weight {
-    fn from(value: f64) -> Self {
-        Self(value * 10.0)
-    }
-}
-impl From<Weight> for f64 {
-    fn from(val: Weight) -> Self {
-        val.0 / 10.0
-    }
-}
 
 // Profile defines the entire profile, with multiple stages.
 /* need:
@@ -107,26 +32,6 @@ pub struct Profile {
 }
 
 impl Profile {
-    fn new(
-        //start_time: SystemTime,
-        init_temperature: f64,
-        target_weight: f64,
-        wait_after_heating: bool,
-        auto_purge: bool,
-        stages: HashMap<u8, Stage>,
-        stage_log: HashMap<u8, StageLog>,
-    ) -> Self {
-        Self {
-            //    start_time,
-            starting_temp: Temp(init_temperature),
-            target_weight: Weight(target_weight),
-            wait_after_heating,
-            auto_purge,
-            stage_log,
-            stages,
-        }
-    }
-
     pub fn get_starting_temp(&self) -> Temp {
         self.starting_temp
     }
@@ -163,11 +68,8 @@ impl TryFrom<&JsonValue> for Profile {
     //type Error = json::Error;
     type Error = ProfileError;
 
-    fn try_from(e: &JsonValue) -> Result<Self, Self::Error> {
-        match e {
-            JsonValue::Object(o) => Self::try_from(o),
-            _ => Err(ProfileError::Type("Expected object, got other".to_string())),
-        }
+    fn try_from(value: &JsonValue) -> Result<Self, Self::Error> {
+        json_val_to_obj_tryfrom!(value)
     }
 }
 
@@ -208,15 +110,15 @@ impl TryFrom<&Object> for Profile {
 
         let stage_log: HashMap<u8, StageLog> = stages
             .iter()
-            .map(|(k, v)| (*k, StageLog::default()))
+            .map(|(k, _)| (*k, StageLog::default()))
             .collect();
         //let start_time: SystemTime = SystemTime::now();
 
         Ok(Self {
-            target_weight: Weight(target_weight),
+            target_weight: Weight::new(target_weight),
             wait_after_heating,
             auto_purge,
-            starting_temp: Temp(temperature),
+            starting_temp: Temp::new(temperature),
             stages,
             stage_log,
             //start_time,
@@ -325,125 +227,4 @@ fn parse_stage(value: &[JsonValue]) -> Result<HashMap<u8, Stage>, ProfileError> 
     }
 
     Ok(out)
-}
-
-#[derive(Debug)]
-pub struct Stage {
-    control_type: ControlType,
-    dynamics: Dynamics,
-    //exitTrigger_len: u8,
-    //exitTrigger: *const ExitTrigger,
-    exit_trigger: Vec<ExitTrigger>,
-    limits: Vec<Limits>,
-}
-
-impl Stage {
-    fn new(
-        control_type: ControlType,
-        dynamics: Dynamics,
-        //exitTrigger_len: u8,
-        //exitTrigger: *const ExitTrigger,
-        exit_trigger: Vec<ExitTrigger>,
-        limits: Vec<Limits>,
-    ) -> Self {
-        Self {
-            control_type,
-            dynamics,
-            exit_trigger,
-            limits,
-        }
-    }
-    pub fn dynamics(&self) -> &Dynamics {
-        &self.dynamics
-    }
-    pub fn exit_triggers(&self) -> &[ExitTrigger] {
-        &self.exit_trigger
-    }
-
-    pub fn limits(&self) -> &[Limits] {
-        &self.limits
-    }
-
-    pub fn ctrl(&self) -> ControlType {
-        self.control_type
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct StageVariables {
-    flow: Flow,
-    pressure: Pressure,
-    piston_pos: Percent,
-    timestamp: SystemTime,
-}
-impl StageVariables {
-    pub fn new(flow: Flow, pressure: Pressure, piston_pos: Percent, timestamp: SystemTime) -> Self {
-        Self {
-            flow,
-            pressure,
-            piston_pos,
-            timestamp,
-        }
-    }
-    pub fn get_timestamp(&self) -> &SystemTime {
-        &self.timestamp
-    }
-    pub fn test() -> Self {
-        Self {
-            flow: Flow(0.0),
-            pressure: Pressure(0.0),
-            piston_pos: Percent(0),
-            timestamp: SystemTime::now(),
-        }
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct StageLog {
-    entry: Option<StageVariables>,
-    exit: Option<StageVariables>,
-}
-
-impl StageLog {
-    pub fn is_valid(&self) -> bool {
-        self.entry.is_some()
-    }
-
-    pub fn get_entry(&self) -> Option<&StageVariables> {
-        self.entry.as_ref()
-    }
-    pub fn get_entry_mut(&mut self) -> Option<&mut StageVariables> {
-        self.entry.as_mut()
-    }
-    pub fn put_entry_log(&mut self, vars: StageVariables) -> Option<StageVariables> {
-        Self::put_log(&mut self.entry, vars)
-    }
-    pub fn get_exit(&self) -> Option<&StageVariables> {
-        self.exit.as_ref()
-    }
-    pub fn get_exit_mut(&mut self) -> Option<&mut StageVariables> {
-        self.exit.as_mut()
-    }
-    pub fn put_exit_log(&mut self, vars: StageVariables) -> Option<StageVariables> {
-        Self::put_log(&mut self.exit, vars)
-    }
-
-    fn put_log(old: &mut Option<StageVariables>, new: StageVariables) -> Option<StageVariables> {
-        if let Some(o) = old {
-            let out = o.clone();
-            *o = new;
-            Some(out)
-        } else {
-            *old = Some(new);
-            None
-        }
-    }
-
-    //pub fn test() -> Self {
-    //    StageLog {
-    //        start: StageVariables::test(),
-    //        end: StageVariables::test(),
-    //        valid: true,
-    //    }
-    //}
 }

@@ -1,8 +1,14 @@
+pub mod dynamics;
+mod exit_trigger;
 pub mod profile_definition;
+mod stage;
+mod types;
 //pub mod profile_generator;
 
 use json::{Error as JsonError, JsonValue};
 pub use profile_definition::*;
+pub use stage::*;
+pub use types::*;
 //pub use profile_generator::*;
 
 #[derive(Debug, Clone)]
