@@ -1,6 +1,8 @@
 use crate::profile::ProfileError;
+use crate::sensor::SensorState;
 use json::object::Object;
 use json::JsonValue;
+use std::fmt::Formatter;
 use std::time::{Duration, SystemTime};
 
 // ExitTrigger: Condition to exit stage and enter next.
@@ -10,13 +12,26 @@ use std::time::{Duration, SystemTime};
 // - check_exit - Should take a Driver (trait?) to get the values to compare with, along with the times
 // - ref-type should be on the time object
 // -
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct ExitTrigger {
     //r#type: ExitType,
     //comparison: ExitComparison,
     //reference: ExitReferenceType,
     //target_stage: u8,
     value: u32,
+}
+
+impl std::fmt::Debug for ExitTrigger {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "ExitTrigger {{ type: {:?}, comparison: {:?}, target_stage {:?}, value: {:?} }}",
+            self.exit_type(),
+            self.exit_comp(),
+            self.target_stage(),
+            self.value()
+        )
+    }
 }
 
 // LAYOUT:
@@ -63,13 +78,13 @@ impl ExitTrigger {
     pub fn exit_type(&self) -> ExitType {
         //self.r#type
         //(((self.value as ExitType::Output) >> ExitType::OFFSET) & ExitType::SIZE)
-        ((self.value >> Self::TYPE_OFFSET) & 2u32.pow(ExitType::BITS) - 1)
+        ((self.value >> Self::TYPE_OFFSET) & (2u32.pow(ExitType::BITS) - 1))
             .try_into()
             .unwrap()
     }
     pub fn exit_comp(&self) -> ExitComparison {
         //self.comparison
-        ((self.value >> Self::COMP_OFFSET) & 2u32.pow(ExitComparison::BITS) - 1)
+        ((self.value >> Self::COMP_OFFSET) & (2u32.pow(ExitComparison::BITS) - 1))
             .try_into()
             .unwrap()
     }
@@ -87,16 +102,16 @@ impl ExitTrigger {
         }
     }
 
-    pub fn check_cond(
+    pub fn check_cond<T: SensorState>(
         &self,
-        input: &crate::sensor::Driver,
+        input: &crate::sensor::Driver<T>,
         stage_timestamp: SystemTime,
         profile_timestamp: SystemTime,
     ) -> bool {
         // this value = lhs, extern input = rhs
-        let rhs = match self.exit_type() {
-            ExitType::Pressure => input.sensor_data().water_pressure,
-            ExitType::Flow => input.sensor_data().water_flow,
+        let lhs = match self.exit_type() {
+            ExitType::Pressure => input.sensor_data().water_pressure(),
+            ExitType::Flow => input.sensor_data().water_flow(),
             ExitType::TimeRelative => SystemTime::now()
                 .duration_since(stage_timestamp)
                 .or_else(|e| Ok::<Duration, ()>(e.duration()))
@@ -107,8 +122,8 @@ impl ExitTrigger {
                 .or_else(|e| Ok::<Duration, ()>(e.duration()))
                 .unwrap()
                 .as_secs_f64(),
-            ExitType::Weight => input.sensor_data().weight,
-            ExitType::PistonPosition => input.sensor_data().piston_position,
+            ExitType::Weight => input.sensor_data().weight(),
+            ExitType::PistonPosition => input.sensor_data().piston_position(),
             ExitType::Button => {
                 if input.get_button_gesture("Encoder Button", "Single Tap") {
                     f64::MAX
@@ -116,10 +131,15 @@ impl ExitTrigger {
                     f64::MIN
                 }
             }
-            ExitType::Temperature => input.sensor_data().stable_temperature,
+            ExitType::Temperature => input.sensor_data().stable_temperature(),
             ExitType::Power => unimplemented!("Exit button not done yet"),
         };
-        let lhs = f64::from(self.value());
+        let rhs = f64::from(self.value());
+        println!(
+            "{lhs} {:?} {rhs} with type {:?}",
+            self.exit_comp(),
+            self.exit_type()
+        );
         self.exit_comp().comp(lhs, rhs)
     }
 }
@@ -189,7 +209,7 @@ impl TryFrom<u32> for ExitType {
         if value > Self::MAX_VALUE {
             Err("Value out of bounds")
         } else {
-            Ok(unsafe { std::mem::transmute(value as u8) })
+            Ok(unsafe { std::mem::transmute::<u8, Self>(value as u8) })
         }
     }
 }
@@ -205,7 +225,7 @@ impl TryFrom<u32> for ExitComparison {
         if value > Self::MAX_VALUE {
             Err("Value out of bounds")
         } else {
-            Ok(unsafe { std::mem::transmute(value as u8) })
+            Ok(unsafe { std::mem::transmute::<u8, Self>(value as u8) })
         }
     }
 }
@@ -259,18 +279,14 @@ impl TryFrom<&Object> for ExitType {
             "temperature" => Self::Temperature,
             "button" => Self::Button,
             "time" => {
-                if e.get("relative")
-                    .map(|v| v.as_bool())
-                    .flatten()
-                    .unwrap_or(false)
-                {
+                if e.get("relative").and_then(|v| v.as_bool()).unwrap_or(false) {
                     Self::TimeRelative
                 } else {
                     Self::TimeAbsolute
                 }
             }
             x => {
-                return Err(ProfileError::JsonNameError(format!(
+                return Err(ProfileError::Name(format!(
                     "No valid argument for exit_trigger type, got `{x}`"
                 )))
             }
@@ -280,7 +296,6 @@ impl TryFrom<&Object> for ExitType {
     }
 }
 
-
 impl TryFrom<&JsonValue> for ExitComparison {
     //type Error = json::Error;
     type Error = ProfileError;
@@ -289,11 +304,13 @@ impl TryFrom<&JsonValue> for ExitComparison {
         e.as_str()
             .ok_or(ProfileError::unexpected_type("string"))
             .and_then(|s| match s {
-                "smaller" => Ok(ExitComparison::Smaller),
-                "smaller-strict" => Ok(ExitComparison::SmallerStrict),
-                "greater" => Ok(ExitComparison::Greater),
-                "greater-struct" => Ok(ExitComparison::GreaterStrict),
-                x => Err(ProfileError::JsonNameError(format!("No correct value provided, got {x}"))),
+                "smaller" | "<=" => Ok(ExitComparison::Smaller),
+                "smaller-strict" | "<" => Ok(ExitComparison::SmallerStrict),
+                "greater" | ">=" => Ok(ExitComparison::Greater),
+                "greater-strict" | ">" => Ok(ExitComparison::GreaterStrict),
+                x => Err(ProfileError::Name(format!(
+                    "No correct value provided, got {x}"
+                ))),
             })
     }
 }

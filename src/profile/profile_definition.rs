@@ -1,102 +1,83 @@
 use super::ProfileError;
+use crate::dynamics::{ControlType, Dynamics, Limits};
 use crate::exit_trigger::{ExitComparison, ExitTrigger, ExitType};
 use json::object::Object;
 use json::JsonValue;
 use std::collections::HashMap;
 use std::time::SystemTime;
-use crate::dynamics::{ControlType, Dynamics, Limits};
-use std::ops::Deref;
 
-#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd)]
 #[repr(transparent)]
-pub struct Flow(pub u8);
+pub struct Flow(pub f64);
 impl From<f64> for Flow {
     fn from(value: f64) -> Self {
-        Self((value * 10.0) as u8)
+        Self(value * 10.0)
     }
 }
 
-impl Into<f64> for Flow {
-    fn into(self) -> f64 {
-        <u8 as Into<f64>>::into(self.0) / 10.0
-    }
-}
-impl Into<u16> for Flow {
-    fn into(self) -> u16 {
-        (self.0 / 10) as u16
+impl From<Flow> for f64 {
+    fn from(val: Flow) -> Self {
+        val.0 / 10.0
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd)]
 #[repr(transparent)]
-pub struct Pressure(pub u8);
+pub struct Pressure(pub f64);
 impl From<f64> for Pressure {
     fn from(value: f64) -> Self {
-        Self((value * 10.0) as u8)
+        Self(value * 10.0)
     }
 }
-impl Into<f64> for Pressure {
-    fn into(self) -> f64 {
-        <u8 as Into<f64>>::into(self.0) / 10.0
+impl From<Pressure> for f64 {
+    fn from(val: Pressure) -> Self {
+        val.0 / 10.0
     }
 }
-impl Into<u16> for Pressure {
-    fn into(self) -> u16 {
-        (self.0 / 10) as u16
-    }
-}
+
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct Percent(pub u8);
 impl From<f64> for Percent {
     fn from(value: f64) -> Self {
-        Self((value * 10.0) as u8)
+        Self(value as u8)
     }
 }
-impl Into<f64> for Percent {
-    fn into(self) -> f64 {
-        <u8 as Into<f64>>::into(self.0)
+impl From<Percent> for f64 {
+    fn from(val: Percent) -> Self {
+        <u8 as Into<f64>>::into(val.0)
     }
 }
-impl Into<u16> for Percent {
-    fn into(self) -> u16 {
-        self.0 as u16
+impl From<Percent> for u16 {
+    fn from(val: Percent) -> Self {
+        val.0 as u16
     }
 }
-#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd)]
 #[repr(transparent)]
-pub struct Temp(u16);
+pub struct Temp(f64);
 impl From<f64> for Temp {
     fn from(value: f64) -> Self {
-        Self((value * 10.0) as u16)
+        Self(value * 10.0)
     }
 }
-impl Into<f64> for Temp {
-    fn into(self) -> f64 {
-        <u16 as Into<f64>>::into(self.0) / 10.0
+impl From<Temp> for f64 {
+    fn from(val: Temp) -> Self {
+        val.0 / 10.0
     }
 }
-impl Into<u16> for Temp {
-    fn into(self) -> u16 {
-        (self.0 / 10) as u16
-    }
-}
-#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd)]
 #[repr(transparent)]
-pub struct Weight(u16);
+pub struct Weight(f64);
 impl From<f64> for Weight {
     fn from(value: f64) -> Self {
-        Self((value * 10.0) as u16)
+        Self(value * 10.0)
     }
 }
-impl Into<f64> for Weight {
-    fn into(self) -> f64 {
-        <u16 as Into<f64>>::into(self.0) / 10.0
-    }
-}
-impl Into<u16> for Weight {
-    fn into(self) -> u16 {
-        (self.0 / 10) as u16
+impl From<Weight> for f64 {
+    fn from(val: Weight) -> Self {
+        val.0 / 10.0
     }
 }
 
@@ -111,10 +92,11 @@ impl Into<u16> for Weight {
        - initial-temperature, and
        - wait-after-heating
 */
+#[derive(Debug)]
 pub struct Profile {
-    start_time: SystemTime,
-    temperature: f64,
-    target_weight: f64,
+    //start_time: SystemTime,
+    starting_temp: Temp,
+    target_weight: Weight,
     wait_after_heating: bool,
     auto_purge: bool,
 
@@ -126,7 +108,7 @@ pub struct Profile {
 
 impl Profile {
     fn new(
-        start_time: SystemTime,
+        //start_time: SystemTime,
         init_temperature: f64,
         target_weight: f64,
         wait_after_heating: bool,
@@ -135,14 +117,45 @@ impl Profile {
         stage_log: Vec<StageLog>,
     ) -> Self {
         Self {
-            start_time,
-            temperature: init_temperature,
-            target_weight,
+            //    start_time,
+            starting_temp: Temp(init_temperature),
+            target_weight: Weight(target_weight),
             wait_after_heating,
             auto_purge,
             stage_log,
             stages,
         }
+    }
+
+    pub fn get_starting_temp(&self) -> Temp {
+        self.starting_temp
+    }
+
+    pub fn get_target_weight(&self) -> Weight {
+        self.target_weight
+    }
+
+    pub fn wait_after_heating(&self) -> bool {
+        self.wait_after_heating
+    }
+
+    pub fn get_stages(&self) -> &HashMap<u8, Stage> {
+        &self.stages
+    }
+
+    //pub fn get_stages_mut(&mut self) -> &mut HashMap<u8, Stage> {
+    //    &mut self.stages
+    //}
+
+    pub fn get_stage_logs(&self) -> &[StageLog] {
+        &self.stage_log
+    }
+    pub fn get_stage_logs_mut(&mut self) -> &mut Vec<StageLog> {
+        &mut self.stage_log
+    }
+
+    pub fn auto_purge(&self) -> bool {
+        self.auto_purge
     }
 }
 
@@ -153,9 +166,7 @@ impl TryFrom<&JsonValue> for Profile {
     fn try_from(e: &JsonValue) -> Result<Self, Self::Error> {
         match e {
             JsonValue::Object(o) => Self::try_from(o),
-            _ => Err(ProfileError::JsonTypeError(
-                "Expected object, got other".to_string(),
-            )),
+            _ => Err(ProfileError::Type("Expected object, got other".to_string())),
         }
     }
 }
@@ -174,13 +185,11 @@ impl TryFrom<&Object> for Profile {
 
         let wait_after_heating = e
             .get("wait_after_heating")
-            .map(|v| v.as_bool())
-            .flatten()
+            .and_then(|v| v.as_bool())
             .unwrap_or(false);
         let auto_purge = e
             .get("auto_purge")
-            .map(|v| v.as_bool())
-            .flatten()
+            .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
         let temperature = e
@@ -192,33 +201,30 @@ impl TryFrom<&Object> for Profile {
         let stages = {
             let stage_json = match e.get("stages").ok_or(ProfileError::no_name("stages"))? {
                 JsonValue::Array(arr) => arr,
-                _ => {
-                    return Err(ProfileError::JsonTypeError(
-                        "Expected array, got other".to_string(),
-                    ))
-                }
+                _ => return Err(ProfileError::Type("Expected array, got other".to_string())),
             };
-            parse_stage(&stage_json)?
+            parse_stage(stage_json)?
         };
 
         let stage_log: Vec<StageLog> = Vec::with_capacity(stages.capacity());
-        let start_time: SystemTime = SystemTime::now();
+        //let start_time: SystemTime = SystemTime::now();
 
         Ok(Self {
-            target_weight,
+            target_weight: Weight(target_weight),
             wait_after_heating,
             auto_purge,
-            temperature,
+            starting_temp: Temp(temperature),
             stages,
             stage_log,
-            start_time,
+            //start_time,
         })
     }
 }
 
 fn parse_stage(value: &[JsonValue]) -> Result<HashMap<u8, Stage>, ProfileError> {
-    let names: HashMap<&str, u8>  = value
-        .iter().zip((1u8..).into_iter())
+    let names: HashMap<&str, u8> = value
+        .iter()
+        .zip(1u8..)
         .map(|(v, i)| match v {
             JsonValue::Object(o) => o
                 .get("name")
@@ -227,7 +233,8 @@ fn parse_stage(value: &[JsonValue]) -> Result<HashMap<u8, Stage>, ProfileError> 
                 .ok_or(ProfileError::unexpected_type("string"))
                 .map(|ob| (ob, i)),
             _ => Err(ProfileError::unexpected_type("object")),
-        }).collect::<Result<HashMap<&str, u8>, ProfileError>>()?;
+        })
+        .collect::<Result<HashMap<&str, u8>, ProfileError>>()?;
     let mut out = HashMap::with_capacity(names.capacity());
 
     for v in value {
@@ -247,7 +254,7 @@ fn parse_stage(value: &[JsonValue]) -> Result<HashMap<u8, Stage>, ProfileError> 
             "power" => ControlType::Power,
             "piston_position" => ControlType::PistonPosition,
             x => {
-                return Err(ProfileError::JsonNameError(format!(
+                return Err(ProfileError::Name(format!(
                     "No valid value for type, got `{x}`"
                 )))
             }
@@ -258,9 +265,17 @@ fn parse_stage(value: &[JsonValue]) -> Result<HashMap<u8, Stage>, ProfileError> 
         };
 
         let limits = {
-            match v.get("limits").ok_or(ProfileError::no_name("limits"))? {
-                JsonValue::Array(arr) => arr.into_iter().map(Limits::try_from).collect::<Result<Vec<_>, ProfileError>>()?,
-                _ => return Err(ProfileError::unexpected_type("array")),
+            if let Some(limit_json) = v.get("limits") {
+                match limit_json {
+                    JsonValue::Array(arr) => {
+                        arr.iter()
+                            .map(Limits::try_from)
+                            .collect::<Result<Vec<_>, ProfileError>>()?
+                    }
+                    _ => return Err(ProfileError::unexpected_type("array")),
+                }
+            } else {
+                vec![]
             }
         };
         let exit_triggers = {
@@ -269,7 +284,7 @@ fn parse_stage(value: &[JsonValue]) -> Result<HashMap<u8, Stage>, ProfileError> 
                 .ok_or(ProfileError::no_name("exit_triggers"))?
             {
                 JsonValue::Array(arr) => arr
-                    .into_iter()
+                    .iter()
                     .map(|v| match v {
                         JsonValue::Object(o) => Ok(o),
                         _ => Err(ProfileError::unexpected_type("object")),
@@ -277,26 +292,27 @@ fn parse_stage(value: &[JsonValue]) -> Result<HashMap<u8, Stage>, ProfileError> 
                     .collect::<Result<Vec<&Object>, ProfileError>>()?,
                 _ => return Err(ProfileError::unexpected_type("array")),
             };
-            triggers.into_iter().map(|et| {
-                let exit_type =
-                    ExitType::try_from(et)?;
-                let exit_comp = ExitComparison::try_from(
-                    et.get("comparison")
-                        .ok_or(ProfileError::no_name("comparison"))?,
-                )?;
-                let target_stage = et
-                    .get("target_stage")
-                    .map(|v| v.as_str())
-                    .flatten()
-                    .map(|v| names.get(v).map(|v|*v))
-                    .flatten();
-                let value = et
-                    .get("value")
-                    .ok_or(ProfileError::no_name("value"))?
-                    .as_u32()
-                    .ok_or(ProfileError::unexpected_type("int"))?;
-                Ok(ExitTrigger::new(exit_type, exit_comp, target_stage, value))
-            }).collect::<Result<Vec<ExitTrigger>, ProfileError>>()
+            triggers
+                .into_iter()
+                .map(|et| {
+                    let exit_type = ExitType::try_from(et)?;
+                    let exit_comp = if let Some(v) = et.get("comparison") {
+                        ExitComparison::try_from(v)?
+                    } else {
+                        ExitComparison::default()
+                    };
+                    let target_stage = et
+                        .get("target_stage")
+                        .and_then(|v| v.as_str())
+                        .and_then(|v| names.get(v).copied());
+                    let value = et
+                        .get("value")
+                        .ok_or(ProfileError::no_name("value"))?
+                        .as_u32()
+                        .ok_or(ProfileError::unexpected_type("int"))?;
+                    Ok(ExitTrigger::new(exit_type, exit_comp, target_stage, value))
+                })
+                .collect::<Result<Vec<ExitTrigger>, ProfileError>>()
         }?;
 
         out.insert(
@@ -308,6 +324,7 @@ fn parse_stage(value: &[JsonValue]) -> Result<HashMap<u8, Stage>, ProfileError> 
     Ok(out)
 }
 
+#[derive(Debug)]
 pub struct Stage {
     control_type: ControlType,
     dynamics: Dynamics,
@@ -339,8 +356,17 @@ impl Stage {
     pub fn exit_triggers(&self) -> &[ExitTrigger] {
         &self.exit_trigger
     }
+
+    pub fn limits(&self) -> &[Limits] {
+        &self.limits
+    }
+
+    pub fn ctrl(&self) -> ControlType {
+        self.control_type
+    }
 }
 
+#[derive(Debug)]
 pub struct StageVariables {
     flow: Flow,
     pressure: Pressure,
@@ -353,13 +379,15 @@ impl StageVariables {
     }
     pub fn test() -> Self {
         Self {
-            flow: Flow(0),
-            pressure: Pressure(0),
+            flow: Flow(0.0),
+            pressure: Pressure(0.0),
             piston_pos: Percent(0),
             timestamp: SystemTime::now(),
         }
     }
 }
+
+#[derive(Debug)]
 pub struct StageLog {
     start: StageVariables,
     end: StageVariables,

@@ -1,5 +1,4 @@
-use crate::exit_trigger::ExitTrigger;
-use crate::profile::{Flow, Percent, Pressure, ProfileError, Stage};
+use crate::profile::ProfileError;
 use json::object::Object;
 use json::JsonValue;
 
@@ -16,15 +15,6 @@ pub enum ControlType {
     PistonPosition = 3u8,
 }
 
-impl ControlType {
-    fn is_percentage(&self) -> bool {
-        match self {
-            ControlType::Power | ControlType::PistonPosition => true,
-            _ => false,
-        }
-    }
-}
-
 impl TryFrom<&str> for ControlType {
     type Error = ProfileError;
 
@@ -34,7 +24,7 @@ impl TryFrom<&str> for ControlType {
             "flow" => Ok(Self::Flow),
             "power" => Ok(Self::Power),
             "piston_positon" => Ok(Self::PistonPosition),
-            x => Err(ProfileError::JsonNameError(format!("Unexpected name: {x}"))),
+            x => Err(ProfileError::Name(format!("Unexpected name: {x}"))),
         }
     }
 }
@@ -57,20 +47,22 @@ impl TryFrom<&str> for InputType {
             "time" => Ok(Self::Time),
             "piston_position" => Ok(Self::PistonPosition),
             "weight" => Ok(Self::Weight),
-            x => Err(ProfileError::JsonNameError(format!("Unexpected name: {x}"))),
+            x => Err(ProfileError::Name(format!("Unexpected name: {x}"))),
         }
     }
 }
 
 // How to calculate the slope??
-trait InterpolationAlgorithm {
+trait InterpolationAlgorithm: std::fmt::Debug {
     fn get_value(&self, points: &[Point], input: f64, current_index: usize) -> f64; // Returns a rate `r` (y = r*x)
 }
 
+#[derive(Debug)]
 struct LinearInterpolation;
 
 impl InterpolationAlgorithm for LinearInterpolation {
     fn get_value(&self, points: &[Point], input: f64, current_index: usize) -> f64 {
+        println!("inut: {input}, index: {current_index}");
         let slope: f64 = (points[current_index].y - points[current_index - 1].y)
             / ((points[current_index].x) - (points[current_index - 1].x));
 
@@ -90,17 +82,28 @@ impl TryFrom<&JsonValue> for Point {
     type Error = ProfileError;
 
     fn try_from(value: &JsonValue) -> Result<Self, Self::Error> {
-        todo!()
+        match value {
+            JsonValue::Array(arr) => match <Vec<JsonValue> as AsRef<[JsonValue]>>::as_ref(arr) {
+                [x, y] => Ok(Point {
+                    x: x.as_f64().ok_or(ProfileError::unexpected_type("f64"))?,
+                    y: y.as_f64().ok_or(ProfileError::unexpected_type("f64"))?,
+                }),
+                _ => Err(ProfileError::JsonParsing(
+                    "Expected array with two elements".to_string(),
+                )),
+            },
+            _ => Err(ProfileError::unexpected_type("array")),
+        }
     }
 }
 
 // In the original coe, the use uninitialized Limis from calloc, effectively
 // making the initial value 0, which is what I have done
+#[derive(Debug)]
 pub enum Limits {
     Pressure(f64), // bar
     Flow(f64),     // ml/s
 }
-
 
 impl TryFrom<&JsonValue> for Limits {
     type Error = ProfileError;
@@ -108,9 +111,7 @@ impl TryFrom<&JsonValue> for Limits {
     fn try_from(value: &JsonValue) -> Result<Self, Self::Error> {
         match value {
             JsonValue::Object(o) => Self::try_from(o),
-            _ => Err(ProfileError::JsonTypeError(
-                "Expected object, got other".to_string(),
-            )),
+            _ => Err(ProfileError::Type("Expected object, got other".to_string())),
         }
     }
 }
@@ -118,10 +119,27 @@ impl TryFrom<&Object> for Limits {
     type Error = ProfileError;
 
     fn try_from(value: &Object) -> Result<Self, Self::Error> {
-        todo!()
+        let val = value
+            .get("value")
+            .ok_or(ProfileError::no_name("value"))?
+            .as_f64()
+            .ok_or(ProfileError::unexpected_type("float"))?;
+        match value
+            .get("type")
+            .ok_or(ProfileError::no_name("type"))?
+            .as_str()
+            .ok_or(ProfileError::unexpected_type("string"))?
+        {
+            "flow" => Ok(Limits::Flow(val)),
+            "pressure" => Ok(Limits::Pressure(val)),
+            x => Err(ProfileError::Name(format!(
+                "Limits does not recognize the type value `{x}`"
+            ))),
+        }
     }
 }
 
+#[derive(Debug)]
 pub struct Dynamics {
     //control_select: Option<ControlType>, On stage
     input_select: InputType, //`over`
@@ -151,9 +169,35 @@ impl Dynamics {
     pub fn input_type(&self) -> InputType {
         self.input_select
     }
-    pub fn points(&self) -> &[Point] {
-        &self.points
+    //pub fn points(&self) -> &[Point] {
+    //    &self.points
+    //}
+
+    pub fn run_interpolation(&self, input: f64) -> f64 {
+        match self.find_current_segment(input) {
+            SegmentIndexOrValue::Index(i) => self.interpolation.get_value(&self.points, input, i),
+            SegmentIndexOrValue::Value(v) => v,
+        }
     }
+
+    fn find_current_segment(&self, input: f64) -> SegmentIndexOrValue {
+        match <Vec<_> as AsRef<[_]>>::as_ref(&self.points) {
+            [one] => SegmentIndexOrValue::Value(one.y),
+            [first, ..] if first.x >= input => SegmentIndexOrValue::Value(first.y),
+            [.., last] if last.x <= input => SegmentIndexOrValue::Value(last.y),
+            arr => SegmentIndexOrValue::Index(
+                arr.iter()
+                    .enumerate()
+                    .find_map(|(i, p)| if p.x > input { Some(i) } else { None })
+                    .unwrap(),
+            ),
+        }
+    }
+}
+
+enum SegmentIndexOrValue {
+    Index(usize),
+    Value(f64),
 }
 
 impl TryFrom<&JsonValue> for Dynamics {
@@ -162,9 +206,7 @@ impl TryFrom<&JsonValue> for Dynamics {
     fn try_from(value: &JsonValue) -> Result<Self, Self::Error> {
         match value {
             JsonValue::Object(o) => Self::try_from(o),
-            _ => Err(ProfileError::JsonTypeError(
-                "Expected object, got other".to_string(),
-            )),
+            _ => Err(ProfileError::Type("Expected object, got other".to_string())),
         }
     }
 }
@@ -182,7 +224,7 @@ impl TryFrom<&Object> for Dynamics {
             "piston_position" => InputType::PistonPosition,
             "weight" => InputType::Weight,
             x => {
-                return Err(ProfileError::JsonNameError(format!(
+                return Err(ProfileError::Name(format!(
                     "No valid value for type, got `{x}`"
                 )))
             }
@@ -198,10 +240,11 @@ impl TryFrom<&Object> for Dynamics {
             .get("points")
             .ok_or(ProfileError::no_name("points"))
             .map(|v| match v {
-                JsonValue::Array(arr) => arr.into_iter().map(Point::try_from).collect::<Result<Vec<Point>, ProfileError>>(),
-                _ => Err(ProfileError::JsonTypeError(
-                    "Expected object, got other".to_string(),
-                )),
+                JsonValue::Array(arr) => arr
+                    .iter()
+                    .map(Point::try_from)
+                    .collect::<Result<Vec<Point>, ProfileError>>(),
+                _ => Err(ProfileError::Type("Expected object, got other".to_string())),
             })??;
 
         Ok(Self {
@@ -217,7 +260,7 @@ fn get_interpolation_from_name(
 ) -> Result<Box<dyn InterpolationAlgorithm>, ProfileError> {
     match name {
         "linear" => Ok(Box::new(LinearInterpolation)),
-        x => Err(ProfileError::JsonNameError(format!(
+        x => Err(ProfileError::Name(format!(
             "No valid value for type, got `{x}`"
         ))),
     }
