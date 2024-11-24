@@ -103,7 +103,7 @@ pub struct Profile {
     //stages: *const Stage,
     stages: HashMap<u8, Stage>,
     //stage_log: *const StageLog,
-    stage_log: Vec<StageLog>,
+    stage_log: HashMap<u8, StageLog>,
 }
 
 impl Profile {
@@ -114,7 +114,7 @@ impl Profile {
         wait_after_heating: bool,
         auto_purge: bool,
         stages: HashMap<u8, Stage>,
-        stage_log: Vec<StageLog>,
+        stage_log: HashMap<u8, StageLog>,
     ) -> Self {
         Self {
             //    start_time,
@@ -147,10 +147,10 @@ impl Profile {
     //    &mut self.stages
     //}
 
-    pub fn get_stage_logs(&self) -> &[StageLog] {
+    pub fn get_stage_logs(&self) -> &HashMap<u8, StageLog> {
         &self.stage_log
     }
-    pub fn get_stage_logs_mut(&mut self) -> &mut Vec<StageLog> {
+    pub fn get_stage_logs_mut(&mut self) -> &mut HashMap<u8, StageLog> {
         &mut self.stage_log
     }
 
@@ -206,7 +206,10 @@ impl TryFrom<&Object> for Profile {
             parse_stage(stage_json)?
         };
 
-        let stage_log: Vec<StageLog> = Vec::with_capacity(stages.capacity());
+        let stage_log: HashMap<u8, StageLog> = stages
+            .iter()
+            .map(|(k, v)| (*k, StageLog::default()))
+            .collect();
         //let start_time: SystemTime = SystemTime::now();
 
         Ok(Self {
@@ -366,7 +369,7 @@ impl Stage {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StageVariables {
     flow: Flow,
     pressure: Pressure,
@@ -374,6 +377,14 @@ pub struct StageVariables {
     timestamp: SystemTime,
 }
 impl StageVariables {
+    pub fn new(flow: Flow, pressure: Pressure, piston_pos: Percent, timestamp: SystemTime) -> Self {
+        Self {
+            flow,
+            pressure,
+            piston_pos,
+            timestamp,
+        }
+    }
     pub fn get_timestamp(&self) -> &SystemTime {
         &self.timestamp
     }
@@ -387,27 +398,52 @@ impl StageVariables {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct StageLog {
-    start: StageVariables,
-    end: StageVariables,
-    valid: bool,
+    entry: Option<StageVariables>,
+    exit: Option<StageVariables>,
 }
 
 impl StageLog {
     pub fn is_valid(&self) -> bool {
-        self.valid
+        self.entry.is_some()
     }
 
-    pub fn get_start(&self) -> &StageVariables {
-        &self.start
+    pub fn get_entry(&self) -> Option<&StageVariables> {
+        self.entry.as_ref()
+    }
+    pub fn get_entry_mut(&mut self) -> Option<&mut StageVariables> {
+        self.entry.as_mut()
+    }
+    pub fn put_entry_log(&mut self, vars: StageVariables) -> Option<StageVariables> {
+        Self::put_log(&mut self.entry, vars)
+    }
+    pub fn get_exit(&self) -> Option<&StageVariables> {
+        self.exit.as_ref()
+    }
+    pub fn get_exit_mut(&mut self) -> Option<&mut StageVariables> {
+        self.exit.as_mut()
+    }
+    pub fn put_exit_log(&mut self, vars: StageVariables) -> Option<StageVariables> {
+        Self::put_log(&mut self.exit, vars)
     }
 
-    pub fn test() -> Self {
-        StageLog {
-            start: StageVariables::test(),
-            end: StageVariables::test(),
-            valid: true,
+    fn put_log(old: &mut Option<StageVariables>, new: StageVariables) -> Option<StageVariables> {
+        if let Some(o) = old {
+            let out = o.clone();
+            *o = new;
+            Some(out)
+        } else {
+            *old = Some(new);
+            None
         }
     }
+
+    //pub fn test() -> Self {
+    //    StageLog {
+    //        start: StageVariables::test(),
+    //        end: StageVariables::test(),
+    //        valid: true,
+    //    }
+    //}
 }

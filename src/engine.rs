@@ -1,6 +1,6 @@
 use crate::dynamics::{ControlType, InputType, Limits};
 use crate::engine::EngineStepResult::{Finished, Next};
-use crate::profile::{Flow, Pressure, Profile, StageLog};
+use crate::profile::{Flow, Pressure, Profile, StageVariables};
 use crate::sensor::{Driver, SensorState};
 use std::time::SystemTime;
 
@@ -111,7 +111,7 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
                     self.state = PS::Brewing;
                     self.profile_start_time = SystemTime::now();
                     self.stage_start_time = SystemTime::now();
-                    self.save_stage_log(None);
+                    //self.save_stage_log(None);
                 }
             }
             PS::Brewing => {
@@ -147,7 +147,51 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
     // If it's an exiting stage, give Some with the exit timestamp,
     // otherwise it's assumed to be entry, and uses the one set on the value
     fn save_stage_log(&mut self, _exit_time: Option<SystemTime>) {
-        self.profile.get_stage_logs_mut().push(StageLog::test())
+        //println!("Saving {} log for stage {}. Timestamp = {}", if _exit_time.is_some() { "EXIT"} else {"START"}, this->currentStageId, timestamp);
+        let log = self
+            .profile
+            .get_stage_logs_mut()
+            .get_mut(&self.current_stage_id)
+            .unwrap();
+
+        if let Some(time) = _exit_time {
+            // is exiting stage
+            println!(
+                "Saving EXIT log for stage {}. Timestamp = {:?}",
+                self.current_stage_id, time
+            );
+            let vars = StageVariables::new(
+                self.driver.sensor_data().water_flow().into(),
+                self.driver.sensor_data().piston_position().into(),
+                self.driver.sensor_data().water_pressure().into(),
+                time,
+            );
+            log.put_entry_log(vars);
+        } else {
+            // is entry stage
+            let now = SystemTime::now();
+            println!(
+                "Saving ENTRY log for stage {}. Timestamp = {:?}",
+                self.current_stage_id, now
+            );
+            let vars = StageVariables::new(
+                self.driver.sensor_data().water_flow().into(),
+                self.driver.sensor_data().piston_position().into(),
+                self.driver.sensor_data().water_pressure().into(),
+                now,
+            );
+            log.put_exit_log(vars);
+        };
+
+        //log = &this->profile->stage_log[this->currentStageId];
+
+        //vars->flow = writeProfileFlow(this->driver->get_sensor_data().water_flow);
+        //vars->piston_position = writeProfilePercent(this->driver->get_sensor_data().piston_position);
+        //vars->pressure = writeProfilePressure(this->driver->get_sensor_data().water_pressure);
+        //vars->timestamp = timestamp;
+        //
+        //log->valid = true;
+        //self.profile.get_stage_logs_mut().push(StageLog::test())
     }
 
     fn process_stage_step(&mut self) -> Result<ProfileState, &'static str> {
@@ -166,8 +210,18 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
 
         let elapsed = self.profile_start_time.elapsed().unwrap();
 
+        {
+            let stage_log = self
+                .profile
+                .get_stage_logs()
+                .get(&self.current_stage_id)
+                .unwrap();
+            if !stage_log.is_valid() {
+                self.save_stage_log(None);
+            }
+        }
+
         let stage = &self.profile.get_stages()[&self.current_stage_id];
-        //let stage_log: &StageLog = &self.profile.get_stage_logs()[self.current_stage_id as usize];
 
         //TODO: What does the sampler actually do???!
         // Ensure the sampler is fed with the right stage
@@ -189,10 +243,6 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
         //    }
         //    //self.save_stage_log(None);
         //}
-        //let stage_time_stamp = (SystemTime.now()
-        //    - (self.start_time_stamp.unwrap()
-        //        + stage_log.get_start().get_timestamp().elapsed().unwrap()))
-        //    / Duration::from_millis(1);
         let exit_triggers = stage.exit_triggers();
 
         for trigger in exit_triggers {
@@ -251,6 +301,8 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
 
     fn transition_stage(&mut self, target_stage: u8) -> ProfileState {
         use ProfileState as PS;
+
+        self.save_stage_log(Some(self.stage_start_time));
 
         self.current_stage_id = target_stage;
 
