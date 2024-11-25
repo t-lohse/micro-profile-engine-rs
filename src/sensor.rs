@@ -227,36 +227,36 @@ mod hardware_connection {
     }
 
     pub fn set_target_weight(set_point: Weight) {
-        println!("Setting target weight to {}", Into::<f64>::into(set_point));
+        println!("Setting target weight to {}", set_point.raw_value());
     }
 
     pub fn set_target_temperature(set_point: Temp) {
         println!(
             "Setting target temperature to {}",
-            Into::<f64>::into(set_point)
+            set_point.raw_value()
         );
     }
 
     pub fn set_target_pressure(set_point: Pressure) {
         println!(
             "Setting target pressure to {}",
-            Into::<f64>::into(set_point)
+            set_point.raw_value()
         );
     }
 
     pub fn set_limited_pressure(set_point: Pressure) {
         println!(
             "Setting target pressure limit to {}",
-            Into::<f64>::into(set_point)
+            set_point.raw_value()
         );
     }
 
     pub fn set_target_flow(set_point: Flow) {
-        println!("Setting target flow to {}", Into::<f64>::into(set_point));
+        println!("Setting target flow to {}", set_point.raw_value());
     }
 
     pub fn set_limited_flow(set_point: Flow) {
-        println!("Setting flow limit to {}", Into::<f64>::into(set_point));
+        println!("Setting flow limit to {}", set_point.raw_value());
     }
 
     pub fn set_target_power(set_point: f64) {
