@@ -55,11 +55,7 @@ impl From<Percent> for f64 {
         val.0
     }
 }
-impl From<Percent> for u16 {
-    fn from(val: Percent) -> Self {
-        val.0 as u16
-    }
-}
+
 #[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd)]
 #[repr(transparent)]
 pub struct Temp(f64);
