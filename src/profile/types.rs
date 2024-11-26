@@ -6,7 +6,9 @@ impl Flow {
         Self(v)
     }
 
-    pub fn raw_value(&self) -> f64 {self.0}
+    pub fn raw_value(&self) -> f64 {
+        self.0
+    }
 }
 impl From<f64> for Flow {
     fn from(value: f64) -> Self {
@@ -27,8 +29,9 @@ impl Pressure {
     pub fn new(v: f64) -> Self {
         Self(v)
     }
-    pub fn raw_value(&self) -> f64 {self.0}
-
+    pub fn raw_value(&self) -> f64 {
+        self.0
+    }
 }
 impl From<f64> for Pressure {
     fn from(value: f64) -> Self {
@@ -48,8 +51,9 @@ impl Percent {
     pub fn new(v: f64) -> Self {
         Self(v)
     }
-    pub fn raw_value(&self) -> f64 {self.0}
-
+    pub fn raw_value(&self) -> f64 {
+        self.0
+    }
 }
 impl From<f64> for Percent {
     fn from(value: f64) -> Self {
@@ -69,8 +73,9 @@ impl Temp {
     pub fn new(v: f64) -> Self {
         Self(v)
     }
-    pub fn raw_value(&self) -> f64 {self.0}
-
+    pub fn raw_value(&self) -> f64 {
+        self.0
+    }
 }
 impl From<f64> for Temp {
     fn from(value: f64) -> Self {
@@ -91,8 +96,9 @@ impl Weight {
     pub fn new(v: f64) -> Self {
         Self(v)
     }
-    pub fn raw_value(&self) -> f64 {self.0}
-
+    pub fn raw_value(&self) -> f64 {
+        self.0
+    }
 }
 impl From<f64> for Weight {
     fn from(value: f64) -> Self {

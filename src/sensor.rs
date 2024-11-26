@@ -231,24 +231,15 @@ mod hardware_connection {
     }
 
     pub fn set_target_temperature(set_point: Temp) {
-        println!(
-            "Setting target temperature to {}",
-            set_point.raw_value()
-        );
+        println!("Setting target temperature to {}", set_point.raw_value());
     }
 
     pub fn set_target_pressure(set_point: Pressure) {
-        println!(
-            "Setting target pressure to {}",
-            set_point.raw_value()
-        );
+        println!("Setting target pressure to {}", set_point.raw_value());
     }
 
     pub fn set_limited_pressure(set_point: Pressure) {
-        println!(
-            "Setting target pressure limit to {}",
-            set_point.raw_value()
-        );
+        println!("Setting target pressure limit to {}", set_point.raw_value());
     }
 
     pub fn set_target_flow(set_point: Flow) {

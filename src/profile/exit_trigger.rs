@@ -42,7 +42,7 @@ impl ExitTrigger {
     const TYPE_OFFSET: u32 = 0;
     const COMP_OFFSET: u32 = Self::TYPE_OFFSET + ExitType::BITS;
 
-    const TARGET_OFFSET: u32 = Self::COMP_OFFSET + ExitType::BITS;
+    const TARGET_OFFSET: u32 = Self::COMP_OFFSET + ExitComparison::BITS;
 
     const VALUE_OFFSET: u32 = Self::TARGET_OFFSET + u8::BITS;
     pub const VALUE_MAX: u32 = u32::MAX >> Self::VALUE_OFFSET;
@@ -145,11 +145,7 @@ impl ExitTrigger {
 
 trait BitSize {
     const MAX_VALUE: u32;
-    const BITS: u32 = if Self::MAX_VALUE.is_power_of_two() && Self::MAX_VALUE != 1 {
-        Self::MAX_VALUE.ilog2()
-    } else {
-        Self::MAX_VALUE.ilog2() + 1
-    };
+    const BITS: u32 = Self::MAX_VALUE.ilog2() + 1;
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

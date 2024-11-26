@@ -19,7 +19,7 @@ pub enum ProfileError {
 }
 
 pub trait FromJson: Sized {
-    fn parse_value(value: &json::JsonValue) -> Result<Self, ProfileError>;
+    fn parse_value(value: &JsonValue) -> Result<Self, ProfileError>;
     //fn parse_object(value: &json::object::Object) -> Result<Self, ProfileError>;
 }
 
@@ -73,9 +73,13 @@ impl From<JsonError> for ProfileError {
                 line: l,
                 column: c,
             } => Self::JsonParsing(format!("Parsing error on {l}:{c}, character: {v}")),
-            JsonError::UnexpectedEndOfJson => todo!(),
-            JsonError::ExceededDepthLimit => todo!(),
-            JsonError::FailedUtf8Parsing => todo!(),
+            JsonError::UnexpectedEndOfJson => {
+                Self::JsonParsing("Unexpected end of json".to_string())
+            }
+            JsonError::ExceededDepthLimit => {
+                Self::JsonParsing("Depth limit of json reached".to_string())
+            }
+            JsonError::FailedUtf8Parsing => Self::JsonParsing("Failed UTF8 parsing".to_string()),
             JsonError::WrongType(x) => Self::Type(x),
         }
     }
