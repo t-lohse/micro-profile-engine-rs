@@ -1,5 +1,5 @@
 use super::{ProfileError, StageLog, Temp, Weight};
-use crate::profile::dynamics::{ControlType, Dynamics, Limits};
+use crate::profile::dynamics::{ControlType, Dynamics, Limit};
 use crate::profile::exit_trigger::{ExitComparison, ExitTrigger, ExitType};
 use crate::profile::stage::Stage;
 use json::object::Object;
@@ -115,10 +115,10 @@ impl TryFrom<&Object> for Profile {
         //let start_time: SystemTime = SystemTime::now();
 
         Ok(Self {
-            target_weight: Weight::new(target_weight),
+            target_weight: Weight::from(target_weight),
             wait_after_heating,
             auto_purge,
-            starting_temp: Temp::new(temperature),
+            starting_temp: Temp::from(temperature),
             stages,
             stage_log,
             //start_time,
@@ -174,7 +174,7 @@ fn parse_stage(value: &[JsonValue]) -> Result<HashMap<u8, Stage>, ProfileError> 
                 match limit_json {
                     JsonValue::Array(arr) => {
                         arr.iter()
-                            .map(Limits::try_from)
+                            .map(Limit::try_from)
                             .collect::<Result<Vec<_>, ProfileError>>()?
                     }
                     _ => return Err(ProfileError::unexpected_type("array")),

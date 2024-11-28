@@ -1,5 +1,5 @@
 use crate::engine::EngineStepResult::{Finished, Next};
-use crate::profile::dynamics::{ControlType, InputType, Limits};
+use crate::profile::dynamics::{ControlType, InputType, Limit};
 use crate::profile::{Flow, Pressure, Profile, StageVariables};
 use crate::sensor::{Driver, SensorState};
 use std::time::SystemTime;
@@ -239,8 +239,8 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
         // float might not be perfectly encoding zero
         for l in stage.limits() {
             match l {
-                Limits::Pressure(p) => self.driver.set_limited_pressure(Pressure::new(*p)), // NOTE: In C++ it is limited flow?
-                Limits::Flow(f) => self.driver.set_limited_flow(Flow::new(*f)),
+                Limit::Pressure(p) => self.driver.set_pressure_limit(Pressure::from(*p)), // NOTE: In C++ it is limited flow?
+                Limit::Flow(f) => self.driver.set_flow_limit(Flow::from(*f)),
             }
         }
 

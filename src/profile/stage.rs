@@ -1,4 +1,4 @@
-use crate::profile::dynamics::{ControlType, Dynamics, Limits};
+use crate::profile::dynamics::{ControlType, Dynamics, Limit};
 use crate::profile::exit_trigger::ExitTrigger;
 use crate::profile::{Flow, Percent, Pressure};
 use std::time::SystemTime;
@@ -10,7 +10,7 @@ pub struct Stage {
     //exitTrigger_len: u8,
     //exitTrigger: *const ExitTrigger,
     exit_trigger: Vec<ExitTrigger>,
-    limits: Vec<Limits>,
+    limits: Vec<Limit>,
 }
 
 impl Stage {
@@ -20,7 +20,7 @@ impl Stage {
         //exitTrigger_len: u8,
         //exitTrigger: *const ExitTrigger,
         exit_trigger: Vec<ExitTrigger>,
-        limits: Vec<Limits>,
+        limits: Vec<Limit>,
     ) -> Self {
         Self {
             control_type,
@@ -36,7 +36,7 @@ impl Stage {
         &self.exit_trigger
     }
 
-    pub fn limits(&self) -> &[Limits] {
+    pub fn limits(&self) -> &[Limit] {
         &self.limits
     }
 
@@ -97,13 +97,8 @@ impl StageLog {
     }
 
     fn put_log(old: &mut Option<StageVariables>, new: StageVariables) -> Option<StageVariables> {
-        if let Some(o) = old {
-            let out = o.clone();
-            *o = new;
-            Some(out)
-        } else {
-            *old = Some(new);
-            None
-        }
+        let o = old.take();
+        *old = Some(new);
+        o
     }
 }

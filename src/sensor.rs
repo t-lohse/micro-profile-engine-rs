@@ -58,16 +58,16 @@ impl<T: SensorState> Driver<T> {
         hardware_connection::set_target_pressure(set_point)
     }
 
-    pub fn set_limited_pressure(&self, set_point: Pressure) {
-        hardware_connection::set_limited_pressure(set_point)
+    pub fn set_pressure_limit(&self, set_point: Pressure) {
+        hardware_connection::set_pressure_limit(set_point)
     }
 
     pub fn set_target_flow(&self, set_point: Flow) {
         hardware_connection::set_target_flow(set_point)
     }
 
-    pub fn set_limited_flow(&self, set_point: Flow) {
-        hardware_connection::set_limited_flow(set_point)
+    pub fn set_flow_limit(&self, set_point: Flow) {
+        hardware_connection::set_flow_limit(set_point)
     }
 
     pub fn set_target_power(&self, set_point: f64) {
@@ -227,34 +227,58 @@ mod hardware_connection {
     }
 
     pub fn set_target_weight(set_point: Weight) {
-        println!("Setting target weight to {}", set_point.raw_value());
+        println!(
+            "Setting target weight to {}",
+            <_ as Into<f64>>::into(set_point)
+        );
     }
 
     pub fn set_target_temperature(set_point: Temp) {
-        println!("Setting target temperature to {}", set_point.raw_value());
+        println!(
+            "Setting target temperature to {}",
+            <_ as Into<f64>>::into(set_point)
+        );
     }
 
     pub fn set_target_pressure(set_point: Pressure) {
-        println!("Setting target pressure to {}", set_point.raw_value());
+        println!(
+            "Setting target pressure to {}",
+            <_ as Into<f64>>::into(set_point)
+        );
     }
 
-    pub fn set_limited_pressure(set_point: Pressure) {
-        println!("Setting target pressure limit to {}", set_point.raw_value());
+    pub fn set_pressure_limit(set_point: Pressure) {
+        println!(
+            "Setting target pressure limit to {}",
+            <_ as Into<f64>>::into(set_point)
+        );
     }
 
     pub fn set_target_flow(set_point: Flow) {
-        println!("Setting target flow to {}", set_point.raw_value());
+        println!(
+            "Setting target flow to {}",
+            <_ as Into<f64>>::into(set_point)
+        );
     }
 
-    pub fn set_limited_flow(set_point: Flow) {
-        println!("Setting flow limit to {}", set_point.raw_value());
+    pub fn set_flow_limit(set_point: Flow) {
+        println!(
+            "Setting flow limit to {}",
+            <_ as Into<f64>>::into(set_point)
+        );
     }
 
     pub fn set_target_power(set_point: f64) {
-        println!("Setting target power to {}", set_point);
+        println!(
+            "Setting target power to {}",
+            <_ as Into<f64>>::into(set_point)
+        );
     }
 
     pub fn set_target_piston_position(set_point: f64) {
-        println!("Setting target piston position to {}", set_point);
+        println!(
+            "Setting target piston position to {}",
+            <_ as Into<f64>>::into(set_point)
+        );
     }
 }

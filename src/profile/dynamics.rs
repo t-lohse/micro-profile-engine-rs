@@ -62,7 +62,7 @@ struct LinearInterpolation;
 
 impl InterpolationAlgorithm for LinearInterpolation {
     fn get_value(&self, points: &[Point], input: f64, current_index: usize) -> f64 {
-        println!("inut: {input}, index: {current_index}");
+        println!("input: {input}, index: {current_index}");
         let slope: f64 = (points[current_index].y - points[current_index - 1].y)
             / ((points[current_index].x) - (points[current_index - 1].x));
 
@@ -100,19 +100,19 @@ impl TryFrom<&JsonValue> for Point {
 // In the original coe, the use uninitialized Limis from calloc, effectively
 // making the initial value 0, which is what I have done
 #[derive(Debug)]
-pub enum Limits {
+pub enum Limit {
     Pressure(f64), // bar
     Flow(f64),     // ml/s
 }
 
-impl TryFrom<&JsonValue> for Limits {
+impl TryFrom<&JsonValue> for Limit {
     type Error = ProfileError;
 
     fn try_from(value: &JsonValue) -> Result<Self, Self::Error> {
         json_val_to_obj_tryfrom!(value)
     }
 }
-impl TryFrom<&Object> for Limits {
+impl TryFrom<&Object> for Limit {
     type Error = ProfileError;
 
     fn try_from(value: &Object) -> Result<Self, Self::Error> {
@@ -127,8 +127,8 @@ impl TryFrom<&Object> for Limits {
             .as_str()
             .ok_or(ProfileError::unexpected_type("string"))?
         {
-            "flow" => Ok(Limits::Flow(val)),
-            "pressure" => Ok(Limits::Pressure(val)),
+            "flow" => Ok(Limit::Flow(val)),
+            "pressure" => Ok(Limit::Pressure(val)),
             x => Err(ProfileError::Name(format!(
                 "Limits does not recognize the type value `{x}`"
             ))),
@@ -164,13 +164,13 @@ impl Dynamics {
 
     fn find_current_segment(&self, input: f64) -> SegmentIndexOrValue {
         match <Vec<_> as AsRef<[_]>>::as_ref(&self.points) {
-            [one] => SegmentIndexOrValue::Value(one.y),
+            [first] => SegmentIndexOrValue::Value(first.y),
             [first, ..] if first.x >= input => SegmentIndexOrValue::Value(first.y),
             [.., last] if last.x <= input => SegmentIndexOrValue::Value(last.y),
             arr => SegmentIndexOrValue::Index(
                 arr.iter()
                     .enumerate()
-                    .find_map(|(i, p)| if p.x > input { Some(i) } else { None })
+                    .find_map(|(i, p)| if p.x >= input { Some(i) } else { None })
                     .unwrap(),
             ),
         }
@@ -225,6 +225,11 @@ impl TryFrom<&Object> for Dynamics {
                     .collect::<Result<Vec<Point>, ProfileError>>(),
                 _ => Err(ProfileError::Type("Expected object, got other".to_string())),
             })??;
+        if points.is_empty() {
+            return Err(ProfileError::JsonParsing(
+                "Note enough points provided, minimum 1".to_string(),
+            ));
+        }
 
         Ok(Self {
             points,
