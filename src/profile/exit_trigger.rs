@@ -5,13 +5,6 @@ use json::JsonValue;
 use std::fmt::Formatter;
 use std::time::{Duration, SystemTime};
 
-// ExitTrigger: Condition to exit stage and enter next.
-// The variants are the ExitType that must be compared to a value
-// If time, value must be specified to be either absolute (for entire profile) or relative (stage)
-// What's needed:
-// - check_exit - Should take a Driver (trait?) to get the values to compare with, along with the times
-// - ref-type should be on the time object
-// -
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct ExitTrigger {
     //r#type: ExitType,
@@ -75,20 +68,16 @@ impl ExitTrigger {
     }
 
     pub fn exit_type(&self) -> ExitType {
-        //self.r#type
-        //(((self.value as ExitType::Output) >> ExitType::OFFSET) & ExitType::SIZE)
         ((self.value >> Self::TYPE_OFFSET) & (2u32.pow(ExitType::BITS) - 1))
             .try_into()
             .unwrap()
     }
     pub fn exit_comp(&self) -> ExitComparison {
-        //self.comparison
         ((self.value >> Self::COMP_OFFSET) & (2u32.pow(ExitComparison::BITS) - 1))
             .try_into()
             .unwrap()
     }
     pub fn value(&self) -> u32 {
-        //self.value
         self.value >> (Self::VALUE_OFFSET)
     }
 
@@ -134,11 +123,6 @@ impl ExitTrigger {
             ExitType::Power => unimplemented!("Exit button not done yet"),
         };
         let rhs = f64::from(self.value());
-        println!(
-            "{lhs} {:?} {rhs} with type {:?}",
-            self.exit_comp(),
-            self.exit_type()
-        );
         self.exit_comp().comp(lhs, rhs)
     }
 }
@@ -170,11 +154,11 @@ impl BitSize for ExitType {
 #[repr(u8)]
 // 2 bits used
 pub enum ExitComparison {
-    Smaller = 0u8,       // ExitValue <= input
-    SmallerStrict = 1u8, // ExitValue < input
+    Smaller = 0u8,
+    SmallerStrict = 1u8,
     #[default]
-    Greater = 2u8, // ExitValue >= input
-    GreaterStrict = 3u8, // ExitValue > input
+    Greater = 2u8,
+    GreaterStrict = 3u8,
 }
 
 impl BitSize for ExitComparison {

@@ -6,17 +6,6 @@ use json::object::Object;
 use json::JsonValue;
 use std::collections::HashMap;
 
-// Profile defines the entire profile, with multiple stages.
-/* need:
-   - Stages : probably an iterator, or vector, depending on if exit_trigger is allowed to jump
-   - stage log : Vector with capacity of the parsed stages, filled after/during each stage
-   - some constants, including
-       - start-time,
-       - final-weight,
-       - auto-purge,
-       - initial-temperature, and
-       - wait-after-heating
-*/
 #[derive(Debug)]
 pub struct Profile {
     //start_time: SystemTime,
@@ -48,10 +37,6 @@ impl Profile {
         &self.stages
     }
 
-    //pub fn get_stages_mut(&mut self) -> &mut HashMap<u8, Stage> {
-    //    &mut self.stages
-    //}
-
     pub fn get_stage_logs(&self) -> &HashMap<u8, StageLog> {
         &self.stage_log
     }
@@ -65,7 +50,6 @@ impl Profile {
 }
 
 impl TryFrom<&JsonValue> for Profile {
-    //type Error = json::Error;
     type Error = ProfileError;
 
     fn try_from(value: &JsonValue) -> Result<Self, Self::Error> {
@@ -74,7 +58,6 @@ impl TryFrom<&JsonValue> for Profile {
 }
 
 impl TryFrom<&Object> for Profile {
-    //type Error = json::Error;
     type Error = ProfileError;
 
     fn try_from(e: &Object) -> Result<Self, Self::Error> {
@@ -112,7 +95,6 @@ impl TryFrom<&Object> for Profile {
             .iter()
             .map(|(k, _)| (*k, StageLog::default()))
             .collect();
-        //let start_time: SystemTime = SystemTime::now();
 
         Ok(Self {
             target_weight: Weight::from(target_weight),
@@ -121,7 +103,6 @@ impl TryFrom<&Object> for Profile {
             starting_temp: Temp::from(temperature),
             stages,
             stage_log,
-            //start_time,
         })
     }
 }

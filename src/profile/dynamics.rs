@@ -2,10 +2,6 @@ use crate::profile::ProfileError;
 use json::object::Object;
 use json::JsonValue;
 
-// Specifies the type of limit, and/or the interpretation of y-axis values??
-// (Can be represented in the YVal of a point)
-// (unused in example, hard to decode meaning)
-// THE TYPE OF STAGE, DAMN
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ControlType {
@@ -29,8 +25,6 @@ impl TryFrom<&str> for ControlType {
     }
 }
 
-// Represents the variable to be controlled in a stage (`over`) - The x-axis?????
-// The input to the x-axis to calculate the y value
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InputType {
@@ -52,7 +46,6 @@ impl TryFrom<&str> for InputType {
     }
 }
 
-// How to calculate the slope??
 trait InterpolationAlgorithm: std::fmt::Debug {
     fn get_value(&self, points: &[Point], input: f64, current_index: usize) -> f64; // Returns a rate `r` (y = r*x)
 }
@@ -62,7 +55,6 @@ struct LinearInterpolation;
 
 impl InterpolationAlgorithm for LinearInterpolation {
     fn get_value(&self, points: &[Point], input: f64, current_index: usize) -> f64 {
-        println!("input: {input}, index: {current_index}");
         let slope: f64 = (points[current_index].y - points[current_index - 1].y)
             / (points[current_index].x - points[current_index - 1].x);
 
@@ -71,7 +63,6 @@ impl InterpolationAlgorithm for LinearInterpolation {
     }
 }
 
-// Point on graph, x is time, y is value from control-type
 #[derive(Debug, Clone, Copy)]
 pub struct Point {
     pub x: f64,
@@ -97,8 +88,6 @@ impl TryFrom<&JsonValue> for Point {
     }
 }
 
-// In the original coe, the use uninitialized Limis from calloc, effectively
-// making the initial value 0, which is what I have done
 #[derive(Debug)]
 pub enum Limit {
     Pressure(f64), // bar
@@ -151,9 +140,6 @@ impl Dynamics {
     pub fn input_type(&self) -> InputType {
         self.input_select
     }
-    //pub fn points(&self) -> &[Point] {
-    //    &self.points
-    //}
 
     pub fn run_interpolation(&self, input: f64) -> f64 {
         match self.find_current_segment(input) {

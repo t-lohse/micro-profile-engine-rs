@@ -3,13 +3,11 @@ mod exit_trigger;
 pub mod profile_definition;
 mod stage;
 mod types;
-//pub mod profile_generator;
 
 use json::{Error as JsonError, JsonValue};
 pub use profile_definition::*;
 pub use stage::*;
 pub use types::*;
-//pub use profile_generator::*;
 
 #[derive(Debug, Clone)]
 pub enum ProfileError {
@@ -20,20 +18,12 @@ pub enum ProfileError {
 
 pub trait FromJson: Sized {
     fn parse_value(value: &JsonValue) -> Result<Self, ProfileError>;
-    //fn parse_object(value: &json::object::Object) -> Result<Self, ProfileError>;
 }
 
-impl<
-        T: for<'a> TryFrom<&'a JsonValue, Error = ProfileError>, //+ for<'a> TryFrom<&'a Object, Error = ProfileError>,
-    > FromJson for T
-{
+impl<T: for<'a> TryFrom<&'a JsonValue, Error = ProfileError>> FromJson for T {
     fn parse_value(value: &JsonValue) -> Result<Self, ProfileError> {
         Self::try_from(value)
     }
-
-    //fn parse_object(value: &Object) -> Result<Self, ProfileError> {
-    //    Self::try_from(value)
-    //}
 }
 
 impl ProfileError {

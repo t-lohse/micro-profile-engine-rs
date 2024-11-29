@@ -7,7 +7,6 @@ use std::time::SystemTime;
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProfileState {
     #[default]
-    //Idle,
     Start,
     Heating,
     Ready,
@@ -16,9 +15,6 @@ pub enum ProfileState {
     Done,
     #[allow(unused)]
     Purging,
-    //End,
-
-    //Error,
 }
 
 pub enum EngineStepResult<'a, T: SensorState> {
@@ -40,31 +36,15 @@ pub struct ProfileEngineRunning<'a, T: SensorState> {
 pub struct ProfileEngineIdle<'a, T: SensorState> {
     driver: Driver<T>,
     profile: &'a mut Profile,
-    //start_time: Option<SystemTime>,
-    //state: ProfileState,
 }
 
 impl<'a, T: SensorState> ProfileEngineIdle<'a, T> {
-    pub fn try_new(
-        profile: &'a mut Profile,
-        driver: Driver<T>,
-        //sampler: Sampler,
-        //start_time_stamp: usize,
-        //current_stage_id: usize,
-    ) -> Result<Self, &'static str> {
+    pub fn try_new(profile: &'a mut Profile, driver: Driver<T>) -> Result<Self, &'static str> {
         if profile.get_stages().is_empty() {
             return Err("Profile with no states is not allowed");
         }
 
-        Ok(Self {
-            profile,
-            driver,
-            //sampler,
-            //start_time: None,
-            //current_stage_id: 0,
-            //state: ProfileState::Idle,
-            //_marker: PhantomData::<Idle>,
-        })
+        Ok(Self { profile, driver })
     }
 
     pub fn start(self) -> ProfileEngineRunning<'a, T> {
@@ -88,7 +68,6 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
                 self.state = PS::Heating;
             }
             PS::Heating => {
-                // After starting from idle-state, it heats the module
                 self.driver
                     .set_target_temperature(self.profile.get_starting_temp());
                 self.driver
@@ -100,8 +79,7 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
                 }
             }
             PS::Ready => {
-                self.current_stage_id = 1; // keys in hashmap
-                println!("{}", self.profile.wait_after_heating());
+                self.current_stage_id = 1;
                 if !self.profile.wait_after_heating() {
                     self.state = PS::Retracting;
                 }
@@ -112,7 +90,6 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
                     self.state = PS::Brewing;
                     self.profile_start_time = SystemTime::now();
                     self.stage_start_time = SystemTime::now();
-                    //self.save_stage_log(None);
                 }
             }
             PS::Brewing => {
@@ -140,10 +117,7 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
         Next(self)
     }
 
-    // If it's an exiting stage, give Some with the exit timestamp,
-    // otherwise it's assumed to be entry, and uses the one set on the value
     fn save_stage_log(&mut self, _exit_time: Option<SystemTime>) {
-        //println!("Saving {} log for stage {}. Timestamp = {}", if _exit_time.is_some() { "EXIT"} else {"START"}, this->currentStageId, timestamp);
         let log = self
             .profile
             .get_stage_logs_mut()
@@ -211,13 +185,9 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
             if trigger.check_cond(&self.driver, self.stage_start_time, self.profile_start_time) {
                 println!("EXIT COND");
 
-                // If at least one of them is reached
-                return if let Some(jump_stage) = trigger.target_stage() {
-                    Ok(self.transition_stage(jump_stage))
-                } else {
-                    // Default is increment
-                    Ok(self.transition_stage(self.current_stage_id + 1))
-                };
+                return Ok(self.transition_stage(
+                    trigger.target_stage().unwrap_or(self.current_stage_id + 1),
+                ));
             }
         }
 
@@ -228,8 +198,6 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
             InputType::Weight => self.driver.sensor_data().weight(),
         };
 
-        //        let sampled_output = self.sampler.get(input_ref_val);
-
         let sampled_output = stage_dyn.run_interpolation(input_ref_val);
         println!("sampled ({},{})", input_ref_val, sampled_output);
         println!(
@@ -238,8 +206,6 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
             sampled_output
         );
 
-        // Don't use the parsed value for limiter checks here as the
-        // float might not be perfectly encoding zero
         for l in stage.limits() {
             match l {
                 Limit::Pressure(p) => self.driver.set_pressure_limit(Pressure::from(*p)), // NOTE: In C++ it is limited flow?

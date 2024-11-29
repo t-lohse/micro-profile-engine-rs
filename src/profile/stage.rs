@@ -7,8 +7,6 @@ use std::time::SystemTime;
 pub struct Stage {
     control_type: ControlType,
     dynamics: Dynamics,
-    //exitTrigger_len: u8,
-    //exitTrigger: *const ExitTrigger,
     exit_trigger: Vec<ExitTrigger>,
     limits: Vec<Limit>,
 }

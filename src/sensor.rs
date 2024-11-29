@@ -108,7 +108,6 @@ pub struct DummySensorState {
 impl Default for DummySensorState {
     fn default() -> Self {
         let v = Box::new(0.0);
-        //let ptr = Box::leak(v) as *mut f64;
         Self {
             piston_position: v,
             piston_speed: 0.0,
