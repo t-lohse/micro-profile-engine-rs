@@ -90,12 +90,9 @@ static PROFILE_JSON: &str = r#"{
 fn main() {
     let doc = json::parse(PROFILE_JSON).unwrap();
     let mut profile = Profile::parse_value(&doc).unwrap();
-    println!("{profile:?}");
 
     let driver = Driver::<DummySensorState>::default();
-
     let sensor_data = driver.sensor_data() as *const DummySensorState as *mut DummySensorState;
-    //let mut curr_piston_pos
     let engine_idle = ProfileEngineIdle::try_new(&mut profile, driver).unwrap();
 
     println!("Starting engine");

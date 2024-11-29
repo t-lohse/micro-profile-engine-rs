@@ -1,6 +1,8 @@
 use crate::profile::{Flow, Pressure, Temp, Weight};
 
 pub trait SensorState {
+    #![allow(unused)]
+
     fn piston_position(&self) -> f64;
     fn piston_speed(&self) -> f64;
     fn water_temp(&self) -> f64;

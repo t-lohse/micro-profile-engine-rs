@@ -14,6 +14,7 @@ pub enum ProfileState {
     Retracting,
     Brewing,
     Done,
+    #[allow(unused)]
     Purging,
     //End,
 
@@ -100,6 +101,7 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
             }
             PS::Ready => {
                 self.current_stage_id = 1; // keys in hashmap
+                println!("{}", self.profile.wait_after_heating());
                 if !self.profile.wait_after_heating() {
                     self.state = PS::Retracting;
                 }
@@ -147,6 +149,12 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
             .get_stage_logs_mut()
             .get_mut(&self.current_stage_id)
             .unwrap();
+        let vars = StageVariables::new(
+            self.driver.sensor_data().water_flow().into(),
+            self.driver.sensor_data().piston_position().into(),
+            self.driver.sensor_data().water_pressure().into(),
+            _exit_time.unwrap_or(SystemTime::now()),
+        );
 
         if let Some(time) = _exit_time {
             // is exiting stage
@@ -154,13 +162,8 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
                 "Saving EXIT log for stage {}. Timestamp = {:?}",
                 self.current_stage_id, time
             );
-            let vars = StageVariables::new(
-                self.driver.sensor_data().water_flow().into(),
-                self.driver.sensor_data().piston_position().into(),
-                self.driver.sensor_data().water_pressure().into(),
-                time,
-            );
-            log.put_entry_log(vars);
+
+            log.put_exit_log(vars);
         } else {
             // is entry stage
             let now = SystemTime::now();
@@ -174,7 +177,7 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
                 self.driver.sensor_data().water_pressure().into(),
                 now,
             );
-            log.put_exit_log(vars);
+            log.put_entry_log(vars);
         };
     }
 
@@ -265,7 +268,11 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
 
         self.current_stage_id = target_stage;
 
-        if self.profile.get_stages().get(&target_stage).is_some() {
+        if self
+            .profile
+            .get_stages()
+            .contains_key(&self.current_stage_id)
+        {
             self.stage_start_time = SystemTime::now();
             PS::Brewing
         } else {

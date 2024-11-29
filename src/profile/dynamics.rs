@@ -64,9 +64,9 @@ impl InterpolationAlgorithm for LinearInterpolation {
     fn get_value(&self, points: &[Point], input: f64, current_index: usize) -> f64 {
         println!("input: {input}, index: {current_index}");
         let slope: f64 = (points[current_index].y - points[current_index - 1].y)
-            / ((points[current_index].x) - (points[current_index - 1].x));
+            / (points[current_index].x - points[current_index - 1].x);
 
-        let intercept = points[current_index].y - slope * (points[current_index].x);
+        let intercept = points[current_index].y - slope * points[current_index].x;
         (slope * input) + intercept
     }
 }

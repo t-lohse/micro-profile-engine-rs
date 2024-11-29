@@ -46,6 +46,7 @@ impl Stage {
 }
 
 #[derive(Debug, Clone)]
+#[allow(unused)]
 pub struct StageVariables {
     flow: Flow,
     pressure: Pressure,
@@ -61,6 +62,8 @@ impl StageVariables {
             timestamp,
         }
     }
+
+    #[allow(unused)]
     pub fn get_timestamp(&self) -> &SystemTime {
         &self.timestamp
     }
@@ -73,6 +76,8 @@ pub struct StageLog {
 }
 
 impl StageLog {
+    #![allow(unused)]
+
     pub fn is_valid(&self) -> bool {
         self.entry.is_some()
     }
