@@ -54,7 +54,7 @@ impl<'a, T: SensorState> ProfileEngineIdle<'a, T> {
             profile_start_time: SystemTime::now(),
             stage_start_time: SystemTime::now(),
             state: ProfileState::Heating,
-            current_stage_id: 1,
+            current_stage_id: 0,
         }
     }
 }
@@ -79,7 +79,7 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
                 }
             }
             PS::Ready => {
-                self.current_stage_id = 1;
+                self.current_stage_id = 0;
                 if !self.profile.wait_after_heating() {
                     self.state = PS::Retracting;
                 }
@@ -121,7 +121,7 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
         let log = self
             .profile
             .get_stage_logs_mut()
-            .get_mut(&self.current_stage_id)
+            .get_mut(self.current_stage_id as usize)
             .unwrap();
         let vars = StageVariables::new(
             self.driver.sensor_data().water_flow().into(),
@@ -167,17 +167,15 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
         let elapsed = self.profile_start_time.elapsed().unwrap();
 
         {
-            let stage_log = self
+            let stage_log = &self
                 .profile
-                .get_stage_logs()
-                .get(&self.current_stage_id)
-                .unwrap();
+                .get_stage_logs()[self.current_stage_id as usize];
             if !stage_log.is_valid() {
                 self.save_stage_log(None);
             }
         }
 
-        let stage = &self.profile.get_stages()[&self.current_stage_id];
+        let stage = &self.profile.get_stages()[self.current_stage_id as usize];
 
         let exit_triggers = stage.exit_triggers();
 
@@ -236,8 +234,7 @@ impl<'a, T: SensorState> ProfileEngineRunning<'a, T> {
 
         if self
             .profile
-            .get_stages()
-            .contains_key(&self.current_stage_id)
+            .get_stages().len() > self.current_stage_id as usize
         {
             self.stage_start_time = SystemTime::now();
             PS::Brewing

@@ -86,7 +86,7 @@ impl ExitTrigger {
         if t == 0 {
             None
         } else {
-            Some(t as u8)
+            Some(t as u8 - 1)
         }
     }
 

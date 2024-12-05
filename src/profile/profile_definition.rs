@@ -4,7 +4,7 @@ use crate::profile::exit_trigger::{ExitComparison, ExitTrigger, ExitType};
 use crate::profile::stage::Stage;
 use json::object::Object;
 use json::JsonValue;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 #[derive(Debug)]
 pub struct Profile {
@@ -15,9 +15,9 @@ pub struct Profile {
     auto_purge: bool,
 
     //stages: *const Stage,
-    stages: HashMap<u8, Stage>,
+    stages: Vec<Stage>,
     //stage_log: *const StageLog,
-    stage_log: HashMap<u8, StageLog>,
+    stage_log: Vec<StageLog>,
 }
 
 impl Profile {
@@ -33,14 +33,14 @@ impl Profile {
         self.wait_after_heating
     }
 
-    pub fn get_stages(&self) -> &HashMap<u8, Stage> {
+    pub fn get_stages(&self) -> &[Stage] {
         &self.stages
     }
 
-    pub fn get_stage_logs(&self) -> &HashMap<u8, StageLog> {
+    pub fn get_stage_logs(&self) -> &[StageLog] {
         &self.stage_log
     }
-    pub fn get_stage_logs_mut(&mut self) -> &mut HashMap<u8, StageLog> {
+    pub fn get_stage_logs_mut(&mut self) -> &mut Vec<StageLog> {
         &mut self.stage_log
     }
 
@@ -83,7 +83,7 @@ impl TryFrom<&Object> for Profile {
             .ok_or(ProfileError::no_name("temperature"))?
             .ok_or(ProfileError::unexpected_type("f64"))?;
 
-        let stages = {
+        let stages: BTreeMap<u8, Stage> = {
             let stage_json = match e.get("stages").ok_or(ProfileError::no_name("stages"))? {
                 JsonValue::Array(arr) => arr,
                 _ => return Err(ProfileError::Type("Expected array, got other".to_string())),
@@ -91,9 +91,9 @@ impl TryFrom<&Object> for Profile {
             parse_stage(stage_json)?
         };
 
-        let stage_log: HashMap<u8, StageLog> = stages
+        let stage_log: Vec<StageLog> = stages
             .iter()
-            .map(|(k, _)| (*k, StageLog::default()))
+            .map(|_| StageLog::default())
             .collect();
 
         Ok(Self {
@@ -101,13 +101,13 @@ impl TryFrom<&Object> for Profile {
             wait_after_heating,
             auto_purge,
             starting_temp: Temp::from(temperature),
-            stages,
-            stage_log,
+            stages: stages.into_values().collect(),
+            stage_log,//: stage_log.into_values().collect(),
         })
     }
 }
 
-fn parse_stage(value: &[JsonValue]) -> Result<HashMap<u8, Stage>, ProfileError> {
+fn parse_stage(value: &[JsonValue]) -> Result<BTreeMap<u8, Stage>, ProfileError> {
     let names: HashMap<&str, u8> = value
         .iter()
         .zip(1u8..)
@@ -121,7 +121,8 @@ fn parse_stage(value: &[JsonValue]) -> Result<HashMap<u8, Stage>, ProfileError> 
             _ => Err(ProfileError::unexpected_type("object")),
         })
         .collect::<Result<HashMap<&str, u8>, ProfileError>>()?;
-    let mut out = HashMap::with_capacity(names.capacity());
+
+    let mut out = BTreeMap::new();
 
     for v in value {
         let v = match v {
